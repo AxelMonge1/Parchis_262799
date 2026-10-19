@@ -72,7 +72,7 @@ public class ModeloJuego {
         this.pasosExtraPendientes = pasosExtraPendientes;
     }
 
-    public EstadoJuego getEstado() {
+    public EstadoJuego obtenerEstado() {
         return estado;
     }
 
@@ -141,5 +141,28 @@ public class ModeloJuego {
                 }
             }
         }
+    }
+
+    public void cambiarTurno(){
+        this.contadorSeisSeguidos = 0;
+        this.pasosExtraPendientes = 0;
+        this.turnoActual = (this.turnoActual + 1) % this.jugadores.size();
+    }
+
+    public boolean esFinDelJuego() {
+        for (Jugador jugador : this.jugadores) {
+            boolean todasEnMeta = true;
+
+            for (Ficha ficha : jugador.getFichas()) {
+                if (ficha.getEstado() != EstadoFicha.EN_META) {
+                    todasEnMeta = false;
+                    break;
+                }
+            }
+            if (todasEnMeta) {
+                return true;
+            }
+        }
+        return false;
     }
 }
