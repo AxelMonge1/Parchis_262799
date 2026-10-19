@@ -1,5 +1,4 @@
 package org.itson.conection;
-
 import org.itson.conection.auxiliar.PaqueteRed;
 import org.itson.conection.auxiliar.TipoPaquete;
 import org.itson.controller.ControladorJuego;
@@ -10,55 +9,68 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Administra las conexiones de red TCP, distingue roles (Host/Cliente),
+ * emite latidos (HEARTBEAT) periódicos y enruta los paquetes hacia el Controlador.
+ */
 public class GestorRed {
+
+    private ServerSocket serverSocket;
+    private final List<ConexionTCP> conexiones = new ArrayList<>();
+    private ControladorJuego controlador;
+
     private boolean esHost;
     private int puertoEscucha;
-    private List<ConexionTCP> conexiones;
     private int idJugadorLocal;
-    private ControladorJuego controlador;
-    private ServerSocket serverSocket;
 
     public GestorRed() {
-        this.conexiones = new ArrayList<>();
         this.esHost = false;
+        this.idJugadorLocal = 0;
     }
 
+    /**
+     * Inicializa la máquina actual como Host (Servidor) e inicia la escucha.
+     */
     public boolean iniciarServidor(int puerto) {
         this.esHost = true;
         this.puertoEscucha = puerto;
-        this.idJugadorLocal = 1;
-        // Hilo secundario para escuchar clientes
+        this.idJugadorLocal = 1; // El Host siempre es el Jugador 1
+
         new Thread(this::escucharConexiones).start();
         iniciarEmisorHeartbeat();
         return true;
     }
 
+    /**
+     * Conecta la máquina actual como Cliente al Host remoto.
+     */
     public boolean conectarAHost(String ip, int puerto) {
         this.esHost = false;
         try {
             Socket socket = new Socket(ip, puerto);
             ConexionTCP nuevaConexion = new ConexionTCP(socket);
+
             synchronized (conexiones) {
                 this.conexiones.add(nuevaConexion);
             }
-            // Inicia la escucha de paquetes entrantes enviados por el servidor
+
             procesarPaquetesEntrantes(nuevaConexion);
+            iniciarEmisorHeartbeat();
             return true;
         } catch (IOException e) {
             System.err.println("Error al conectar con el Host: " + e.getMessage());
             return false;
         }
     }
-    public void removerConexion(ConexionTCP conexion) {
-        synchronized (conexiones) {
-            conexiones.remove(conexion);
-        }
-    }
 
+    /**
+     * Bucle del servidor que acepta nuevos clientes, les asigna un ID
+     * y notifica al controlador para evaluar capacidad de la sala.
+     */
     public void escucharConexiones() {
         try {
             this.serverSocket = new ServerSocket(puertoEscucha);
-            System.out.println("Servidor a la escucha en el puerto " + puertoEscucha);
+            System.out.println("Servidor escuchando en el puerto " + puertoEscucha);
 
             while (esHost) {
                 Socket socketCliente = serverSocket.accept();
@@ -67,13 +79,13 @@ public class GestorRed {
                 int idAsignado;
                 synchronized (conexiones) {
                     conexiones.add(nuevaConexion);
-                    idAsignado = conexiones.size() + 1; // Host es 1, Clientes son 2, 3, 4
+                    idAsignado = conexiones.size() + 1; // Host=1, Clientes=2, 3, 4
                     nuevaConexion.setIdJugadorAsociado(idAsignado);
                 }
 
                 procesarPaquetesEntrantes(nuevaConexion);
 
-                // 📍 NUEVO: Le enviamos un paquete al Cliente indicándole su ID de jugador
+                // Notifica al cliente conectado cuál es su ID asignado
                 PaqueteRed paqueteId = new PaqueteRed(
                         TipoPaquete.LOBBY_CONFIRM,
                         1,
@@ -94,23 +106,9 @@ public class GestorRed {
         }
     }
 
-    public void cerrarServidor() {
-        this.esHost = false;
-        synchronized (conexiones) {
-            for (ConexionTCP conexion : conexiones) {
-                conexion.cerrarConexion();
-            }
-            conexiones.clear();
-        }
-        try {
-            if (serverSocket != null && !serverSocket.isClosed()) {
-                serverSocket.close();
-            }
-        } catch (IOException e) {
-            System.err.println("Error al cerrar ServerSocket: " + e.getMessage());
-        }
-    }
-
+    /**
+     * Escucha y enruta los paquetes entrantes de una conexión TCP en un hilo dedicado.
+     */
     public void procesarPaquetesEntrantes(ConexionTCP conexion) {
         new Thread(() -> {
             try {
@@ -118,13 +116,33 @@ public class GestorRed {
                     PaqueteRed paquete = conexion.recibirPaquete();
 
                     if (paquete == null) {
-                        break; // Cliente desconectado o socket cerrado
+                        break; // Socket cerrado o desconectado
                     }
 
-                    // 1. Cualquier paquete válido recibido reinicia el temporizador de vida
+                    // 1. Renueva el timestamp de vida con cualquier paquete recibido
                     conexion.setUltimoHeartbeat(System.currentTimeMillis());
 
-                    // 2. Procesamiento aislado de acciones (un error aquí NO cierra la conexión)
+                    // 2. Respuesta automática a Heartbeats (PING -> PONG) a nivel de red
+                    if (paquete.getTipo() == TipoPaquete.HEARTBEAT) {
+                        if ("PING".equalsIgnoreCase(paquete.getMensaje())) {
+                            conexion.enviarPaquete(new PaqueteRed(
+                                    TipoPaquete.HEARTBEAT,
+                                    idJugadorLocal,
+                                    "PONG"
+                            ));
+                        }
+                        continue;
+                    }
+
+                    // 3. Registro de ID asignado al cliente
+                    if (paquete.getTipo() == TipoPaquete.LOBBY_CONFIRM
+                            && paquete.getMensaje().startsWith("ASIGNAR_ID:")) {
+                        int miId = Integer.parseInt(paquete.getMensaje().split(":")[1]);
+                        this.idJugadorLocal = miId;
+                        System.out.println("ID asignado por el Host: Jugador " + miId);
+                    }
+
+                    // 4. Delegación de reglas y acciones al ControladorJuego
                     if (controlador != null) {
                         try {
                             switch (paquete.getTipo()) {
@@ -141,18 +159,9 @@ public class GestorRed {
                                     controlador.notificarCambioEstado();
                                     break;
 
-                                case HEARTBEAT:
-                                    break;
-
                                 case LOBBY_CONFIRM:
                                     String msg = paquete.getMensaje();
-
-                                    if (msg.startsWith("ASIGNAR_ID:")) {
-                                        int miId = Integer.parseInt(msg.split(":")[1]);
-                                        setIdJugadorLocal(miId); // El cliente guarda su ID oficial (ej. 2)
-                                        System.out.println("ID asignado por el Host: Jugador " + miId);
-                                    }
-                                    else if (msg.startsWith("JUGADOR_LISTO:")) {
+                                    if (msg.startsWith("JUGADOR_LISTO:")) {
                                         int idListo = Integer.parseInt(msg.split(":")[1]);
                                         if (esHost) {
                                             controlador.procesarJugadorListo(idListo);
@@ -160,35 +169,53 @@ public class GestorRed {
                                         } else {
                                             controlador.procesarJugadorListo(idListo);
                                         }
-                                    }
-                                    else if ("INICIAR_JUEGO".equalsIgnoreCase(msg)) {
+                                    } else if ("INICIAR_JUEGO".equalsIgnoreCase(msg)) {
                                         controlador.comenzarPartidaOficial();
                                     }
                                     break;
+
+                                default:
+                                    break;
                             }
                         } catch (Exception ex) {
-                            System.err.println("Error procesando acción de juego: " + ex.getMessage());
+                            System.err.println("Error procesando paquete de juego: " + ex.getMessage());
                         }
                     }
                 }
             } catch (Exception e) {
                 System.err.println("Conexión perdida con socket: " + e.getMessage());
             } finally {
-                // Se ejecuta SOLO al perder el socket realmente
                 conexion.cerrarConexion();
-                removerConexion(conexion); // <--- Rompe el bucle infinito en la terminal
+                removerConexion(conexion);
             }
         }).start();
     }
 
+    /**
+     * Emite un paquete a todas las conexiones TCP activas.
+     */
     public void enviarPaqueteATodos(PaqueteRed paquete) {
         synchronized (conexiones) {
             for (ConexionTCP conexion : conexiones) {
-                conexion.enviarPaquete(paquete);
+                if (conexion.isEstaActivo()) {
+                    conexion.enviarPaquete(paquete);
+                }
             }
         }
     }
 
+    /**
+     * Remueve una conexión inactiva de la lista compartida.
+     */
+    public void removerConexion(ConexionTCP conexion) {
+        synchronized (conexiones) {
+            conexiones.remove(conexion);
+        }
+    }
+
+    /**
+     * Hilo en segundo plano que envía un paquete PING cada 2 segundos.
+     */
     public void iniciarEmisorHeartbeat() {
         new Thread(() -> {
             while (true) {
@@ -207,21 +234,53 @@ public class GestorRed {
         }).start();
     }
 
-    public boolean isEsHost() { return esHost; }
+    /**
+     * Apaga el servidor y cierra todas las conexiones.
+     */
+    public void cerrarServidor() {
+        this.esHost = false;
+        synchronized (conexiones) {
+            for (ConexionTCP conexion : conexiones) {
+                conexion.cerrarConexion();
+            }
+            conexiones.clear();
+        }
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Error al cerrar ServerSocket: " + e.getMessage());
+        }
+    }
 
-    public void setEsHost(boolean esHost) { this.esHost = esHost; }
+    // --- Getters y Setters ---
 
-    public int getPuertoEscucha() { return puertoEscucha; }
+    public boolean isEsHost() {
+        return esHost;
+    }
 
-    public void setPuertoEscucha(int puertoEscucha) { this.puertoEscucha = puertoEscucha; }
+    public void setEsHost(boolean esHost) {
+        this.esHost = esHost;
+    }
 
-    public List<ConexionTCP> getConexiones() { return conexiones; }
+    public int getIdJugadorLocal() {
+        return idJugadorLocal;
+    }
 
-    public int getIdJugadorLocal() { return idJugadorLocal; }
+    public void setIdJugadorLocal(int idJugadorLocal) {
+        this.idJugadorLocal = idJugadorLocal;
+    }
 
-    public void setIdJugadorLocal(int idJugadorLocal) { this.idJugadorLocal = idJugadorLocal; }
+    public List<ConexionTCP> getConexiones() {
+        return conexiones;
+    }
 
-    public ControladorJuego getControlador() { return controlador; }
+    public ControladorJuego getControlador() {
+        return controlador;
+    }
 
-    public void setControlador(ControladorJuego controlador) { this.controlador = controlador; }
+    public void setControlador(ControladorJuego controlador) {
+        this.controlador = controlador;
+    }
 }

@@ -18,7 +18,7 @@ public class Main {
             GestorRed gestorRed = new GestorRed();
 
             // Gestor de desconexiones configurado con un timeout de 5000ms (5 segundos)
-            GestorDesconexiones gestorDesconexiones = new GestorDesconexiones(5000, gestorRed);
+            GestorDesconexiones gestorDesconexiones = new GestorDesconexiones(10000, gestorRed);
 
             // 2. Instanciar el Controlador uniendo las dependencias
             ControladorJuego controlador = new ControladorJuego(modelo, vista, gestorRed);

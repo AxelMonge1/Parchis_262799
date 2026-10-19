@@ -1,106 +1,117 @@
 package org.itson.conection;
-
 import org.itson.conection.auxiliar.PaqueteRed;
 import org.itson.conection.auxiliar.TipoPaquete;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
 import java.net.Socket;
 
-import static java.lang.System.out;
-
+/**
+ * Encapsula un socket TCP individual junto con sus flujos de entrada y salida,
+ * la lógica de serialización/deserialización y el estado de salud de la conexión.
+ */
 public class ConexionTCP {
-    private String ipRemota;
-    private int puerto;
-    private int idJugadorAsociado;
-    private boolean estaActivo;
-    private long ultimoHeartbeat;
 
     private Socket socket;
-    private BufferedReader entrada;
-    private PrintWriter salida;
+    private BufferedReader in;
+    private PrintWriter out;
 
-    public ConexionTCP(Socket socket) throws IOException {
+    private boolean estaActivo;
+    private int idJugadorAsociado;
+    private long ultimoHeartbeat;
+
+    public ConexionTCP(Socket socket) {
         this.socket = socket;
-        this.ipRemota = socket.getInetAddress().getHostAddress();
-        this.puerto = socket.getPort();
         this.estaActivo = true;
-        this.entrada = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-        this.salida = new PrintWriter(socket.getOutputStream(), true);
         this.ultimoHeartbeat = System.currentTimeMillis();
-    }
 
-    public void enviarPaquete(PaqueteRed paquete) {
-        if (estaActivo && out != null) {
-            // Imprime en consola local para depuración
-            out.println("Enviando paquete: " + paquete.serializar());
-
-            // Es indispensable usar println (para que readLine() lo detecte) y flush()
-            out.println(paquete.serializar());
-            out.flush();
-        }
-    }
-
-    public PaqueteRed recibirPaquete() throws IOException {
-        if (!estaActivo) {
-            return null;
-        }
-        String dato = entrada.readLine();
-        if (dato != null) {
-            return deserializar(dato);
-        } else {
+        try {
+            // Configuración del flujo de entrada (lectura) y salida (escritura)
+            this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            this.out = new PrintWriter(socket.getOutputStream(), true); // true = autoFlush
+        } catch (IOException e) {
+            System.err.println("Error al inicializar flujos I/O en socket: " + e.getMessage());
             cerrarConexion();
-            return null;
         }
     }
 
+    /**
+     * Envía un paquete serializado a través del socket asegurando su salida inmediata.
+     */
+    public synchronized void enviarPaquete(PaqueteRed paquete) {
+        if (estaActivo && out != null && paquete != null) {
+            String dato = paquete.serializar();
+            System.out.println("Enviando paquete: " + dato);
+            out.println(dato);
+            out.flush(); // Forzado de envío directo por la red
+        }
+    }
+
+    /**
+     * Lee de forma bloqueante una línea enviada por la otra computadora.
+     */
+    public PaqueteRed recibirPaquete() {
+        try {
+            if (in != null && estaActivo) {
+                String linea = in.readLine();
+
+                if (linea != null && !linea.trim().isEmpty()) {
+                    System.out.println("Paquete recibido: " + linea);
+                    return deserializar(linea);
+                }
+            }
+        } catch (IOException e) {
+            // Captura interrupciones físicas o cierres de socket
+        }
+        return null;
+    }
+
+    /**
+     * Convierte el texto delimitado por punto y coma (TIPO;ID;MENSAJE) a PaqueteRed.
+     */
     public PaqueteRed deserializar(String dato) {
         try {
             if (dato == null || dato.trim().isEmpty()) return null;
 
-            String[] partes = dato.split(";");
+            // Límite de 3 partes para conservar puntos y comas internos dentro del mensaje
+            String[] partes = dato.split(";", 3);
             if (partes.length < 3) return null;
 
-            return new PaqueteRed(
-                    TipoPaquete.valueOf(partes[0]),
-                    Integer.parseInt(partes[1]),
-                    partes[2]
-            );
+            TipoPaquete tipo = TipoPaquete.valueOf(partes[0]);
+            int idEmisor = Integer.parseInt(partes[1]);
+            String mensaje = partes[2];
+
+            return new PaqueteRed(tipo, idEmisor, mensaje);
         } catch (Exception e) {
             System.err.println("Error deserializando paquete recibido (" + dato + "): " + e.getMessage());
             return null;
         }
     }
 
+    /**
+     * Libera recursos y cierra los flujos I/O del socket.
+     */
     public void cerrarConexion() {
-        if (!this.estaActivo) {
-            return;
-        }
         this.estaActivo = false;
         try {
-            if (entrada != null) entrada.close();
-            if (salida != null) salida.close();
-            if (socket != null && !socket.isClosed()) {
-                socket.close();
-            }
+            if (in != null) in.close();
+            if (out != null) out.close();
+            if (socket != null && !socket.isClosed()) socket.close();
         } catch (IOException e) {
-            System.err.println("Error al intentar cerrar la conexión TCP: " + e.getMessage());
+            System.err.println("Error al cerrar conexión TCP: " + e.getMessage());
         }
     }
 
-    public String getIpRemota() {
-        return ipRemota;
+    // --- Getters y Setters ---
+
+    public boolean isEstaActivo() {
+        return estaActivo;
     }
 
-    public void setIpRemota(String ipRemota) {
-        this.ipRemota = ipRemota;
-    }
-
-    public int getPuerto() {
-        return puerto;
-    }
-
-    public void setPuerto(int puerto) {
-        this.puerto = puerto;
+    public void setEstaActivo(boolean estaActivo) {
+        this.estaActivo = estaActivo;
     }
 
     public int getIdJugadorAsociado() {
@@ -111,23 +122,15 @@ public class ConexionTCP {
         this.idJugadorAsociado = idJugadorAsociado;
     }
 
-    public boolean isEstaActivo() {
-        return estaActivo;
-    }
-
-    public void setEstaActivo(boolean estaActivo) {
-        this.estaActivo = estaActivo;
-    }
-
     public long getUltimoHeartbeat() {
         return ultimoHeartbeat;
     }
 
-    public void actualizarHeartbeat() {
-        this.ultimoHeartbeat = System.currentTimeMillis();
-    }
-
     public void setUltimoHeartbeat(long ultimoHeartbeat) {
         this.ultimoHeartbeat = ultimoHeartbeat;
+    }
+
+    public Socket getSocket() {
+        return socket;
     }
 }
