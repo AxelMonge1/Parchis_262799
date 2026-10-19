@@ -1,6 +1,7 @@
 package org.itson.conection;
 
 import org.itson.conection.auxiliar.PaqueteRed;
+import org.itson.conection.auxiliar.TipoPaquete;
 import org.itson.controller.ControladorJuego;
 
 import java.io.IOException;
@@ -28,6 +29,7 @@ public class GestorRed {
         this.idJugadorLocal = 1;
         // Hilo secundario para escuchar clientes
         new Thread(this::escucharConexiones).start();
+        iniciarEmisorHeartbeat();
         return true;
     }
 
@@ -131,6 +133,24 @@ public class GestorRed {
                 conexion.enviarPaquete(paquete);
             }
         }
+    }
+
+    public void iniciarEmisorHeartbeat() {
+        new Thread(() -> {
+            while (true) {
+                try {
+                    Thread.sleep(2000);
+                    PaqueteRed ping = new PaqueteRed(
+                            TipoPaquete.HEARTBEAT,
+                            idJugadorLocal,
+                            "PING"
+                    );
+                    enviarPaqueteATodos(ping);
+                } catch (InterruptedException e) {
+                    break;
+                }
+            }
+        }).start();
     }
 
     public boolean isEsHost() { return esHost; }
