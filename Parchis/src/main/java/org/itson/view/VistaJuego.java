@@ -43,6 +43,7 @@ public class VistaJuego extends JFrame {
     private JLabel[] lblJugadores; // Muestra a los 4 jugadores en las esquinas
     private JButton btnDado;
     private JButton btnAccionLobby;
+    private JLabel lblEstado; // Mensajes de estado no bloqueantes
 
     public VistaJuego() {
         this.coloresLocales = new HashMap<>();
@@ -87,7 +88,7 @@ public class VistaJuego extends JFrame {
     // --- 1. MENÚ PRINCIPAL ---
     private void crearPanelMenu() {
         panelMenu = new JPanel(new GridBagLayout());
-        panelMenu.setBackground(new Color(110, 40, 200)); // Color morado del storyboard
+        panelMenu.setBackground(new Color(110, 40, 200));
 
         JPanel container = new JPanel(new GridLayout(4, 1, 15, 15));
         container.setOpaque(false);
@@ -98,12 +99,12 @@ public class VistaJuego extends JFrame {
 
         btnCrearPartidaMenu = new JButton("Crear partida");
         btnUnirsePartidaMenu = new JButton("Unirse a partida");
-        JButton btnPersonalización = new JButton("Personalización");
-        btnPersonalización.setEnabled(false); // Ignorado por ahora según indicación
+        JButton btnPersonalizacion = new JButton("Personalización");
+        btnPersonalizacion.setEnabled(false);
 
         estilarBoton(btnCrearPartidaMenu);
         estilarBoton(btnUnirsePartidaMenu);
-        estilarBoton(btnPersonalización);
+        estilarBoton(btnPersonalizacion);
 
         btnCrearPartidaMenu.addActionListener(e -> mostrarPantalla(PANTALLA_CREAR));
         btnUnirsePartidaMenu.addActionListener(e -> mostrarPantalla(PANTALLA_UNIRSE));
@@ -111,12 +112,12 @@ public class VistaJuego extends JFrame {
         container.add(lblTitulo);
         container.add(btnCrearPartidaMenu);
         container.add(btnUnirsePartidaMenu);
-        container.add(btnPersonalización);
+        container.add(btnPersonalizacion);
 
         panelMenu.add(container);
     }
 
-    // --- 2. CREAR PARTIDA (Actualizado con nuevos rangos y defaults) ---
+    // --- 2. CREAR PARTIDA ---
     private void crearPanelCrearPartida() {
         panelCrearPartida = new JPanel(new GridBagLayout());
         panelCrearPartida.setBackground(new Color(110, 40, 200));
@@ -128,15 +129,12 @@ public class VistaJuego extends JFrame {
         estilarBoton(btnVolver);
         btnVolver.addActionListener(e -> mostrarPantalla(PANTALLA_MENU));
 
-        // 1. Fichas por jugador: de 3 a 6 (Por defecto: 4)
         cbCantFichas = new JComboBox<>(new Integer[]{3, 4, 5, 6});
         cbCantFichas.setSelectedItem(4);
 
-        // 2. Casillas seguras por ala: de 1 a 5 (Por defecto: 2, según la imagen)
         cbCasillasSeguras = new JComboBox<>(new Integer[]{1, 2, 3, 4, 5});
         cbCasillasSeguras.setSelectedItem(2);
 
-        // 3. Número para sacar ficha: de 1 a 6 (Por defecto: 5)
         cbNumSalida = new JComboBox<>(new Integer[]{1, 2, 3, 4, 5, 6});
         cbNumSalida.setSelectedItem(5);
 
@@ -196,7 +194,6 @@ public class VistaJuego extends JFrame {
         panelTableroJuego = new JPanel(new BorderLayout());
         panelTableroJuego.setBackground(new Color(110, 40, 200));
 
-        // Área central gráfica del tablero
         panelTableroRender = new JPanel() {
             @Override
             protected void paintComponent(Graphics g) {
@@ -207,7 +204,6 @@ public class VistaJuego extends JFrame {
         panelTableroRender.setPreferredSize(new Dimension(480, 480));
         panelTableroRender.setBackground(Color.WHITE);
 
-        // Tarjetas de jugadores en las esquinas según el storyboard
         lblJugadores = new JLabel[4];
         lblJugadores[0] = crearCardJugador("Jugador 1", coloresLocales.get(1));
         lblJugadores[1] = crearCardJugador("Jugador 2", coloresLocales.get(2));
@@ -224,17 +220,26 @@ public class VistaJuego extends JFrame {
         panelSur.add(lblJugadores[2], BorderLayout.WEST);
         panelSur.add(lblJugadores[3], BorderLayout.EAST);
 
-        // Controles de juego en la parte inferior
         btnDado = new JButton("🎲 Lanzar Dado");
         estilarBoton(btnDado);
 
         btnAccionLobby = new JButton("Listo / Comenzar");
         estilarBoton(btnAccionLobby);
 
-        JPanel panelInferior = new JPanel();
+        lblEstado = new JLabel("Esperando inicio...", SwingConstants.CENTER);
+        lblEstado.setFont(new Font("Arial", Font.BOLD, 14));
+        lblEstado.setForeground(Color.WHITE);
+
+        JPanel panelInferior = new JPanel(new GridLayout(2, 1, 5, 5));
         panelInferior.setOpaque(false);
-        panelInferior.add(btnDado);
-        panelInferior.add(btnAccionLobby);
+
+        JPanel panelBotones = new JPanel();
+        panelBotones.setOpaque(false);
+        panelBotones.add(btnDado);
+        panelBotones.add(btnAccionLobby);
+
+        panelInferior.add(panelBotones);
+        panelInferior.add(lblEstado);
 
         panelTableroJuego.add(panelNorte, BorderLayout.NORTH);
         panelTableroJuego.add(panelTableroRender, BorderLayout.CENTER);
@@ -244,23 +249,22 @@ public class VistaJuego extends JFrame {
 
     // --- Métodos del Diagrama de Clases ---
 
-    public void renderizarTablero() { //
+    public void renderizarTablero() {
         if (panelTableroRender != null) {
             panelTableroRender.repaint();
         }
     }
 
-    public void actualizarFichas() { //
-        // Redibuja las posiciones de las fichas sobre el canvas del tablero
+    public void actualizarFichas() {
         renderizarTablero();
     }
 
-    public void mostrarResultadoDado(int valor) { //[cite: 4]
+    public void mostrarResultadoDado(int valor) {
         btnDado.setText("🎲 Dado: " + valor);
-        JOptionPane.showMessageDialog(this, "El dado cayó en: " + valor, "Resultado Dado", JOptionPane.INFORMATION_MESSAGE);
+        actualizarTextoEstado("Resultado del dado: " + valor);
     }
 
-    public void mostrarTurnoActual(int idJugador) { //[cite: 4]
+    public void mostrarTurnoActual(int idJugador) {
         for (int i = 0; i < 4; i++) {
             if (i + 1 == idJugador) {
                 lblJugadores[i].setBorder(BorderFactory.createLineBorder(Color.YELLOW, 3));
@@ -274,46 +278,43 @@ public class VistaJuego extends JFrame {
         SwingUtilities.invokeLater(() -> {
             btnAccionLobby.setEnabled(false);
             btnAccionLobby.setText("Esperando a los demás...");
+            actualizarTextoEstado("Esperando confirmación de todos los jugadores...");
         });
     }
 
     public void prepararInterfazParaInicio(int miId, int turnoActual) {
         SwingUtilities.invokeLater(() -> {
-            // 1. FORZAR EL CAMBIO DE PANTALLA EN EL CardLayout
-            // Reemplaza PANTALLA_JUEGO con la constante/nombre que uses para la pantalla del tablero
             mostrarPantalla(PANTALLA_JUEGO);
 
-            // 2. Actualizar estado del botón de lobby
             btnAccionLobby.setText("En Partida");
             btnAccionLobby.setEnabled(false);
 
-            // 3. Evaluar e informar el turno
             boolean esMiTurno = (miId == turnoActual);
             btnDado.setEnabled(esMiTurno);
 
-            // 4. Feedback visual explícito en un Label o en la consola de la UI
             String mensajeEstado = esMiTurno
                     ? "¡Es TU turno! Haz clic en Lanzar Dado."
                     : "Turno del Jugador " + turnoActual + ". Esperando su jugada...";
 
-            mostrarMensaje(mensajeEstado); // O lblEstado.setText(mensajeEstado);
-
-            // 5. Dibujar tablero
+            actualizarTextoEstado(mensajeEstado);
+            mostrarTurnoActual(turnoActual);
             renderizarTablero();
 
-            // Forzar a Swing a repintar la ventana
-            revalidate();
-            repaint();
+            panelContenedor.revalidate();
+            panelContenedor.repaint();
         });
     }
 
-    public void mostrarMensaje(String mensaje) { //[cite: 4]
-        JOptionPane.showMessageDialog(this, mensaje, "Notificación", JOptionPane.INFORMATION_MESSAGE);
+    public void actualizarTextoEstado(String mensaje) {
+        if (lblEstado != null) {
+            lblEstado.setText(mensaje);
+        }
     }
 
-    /**
-     * Muestra la modal "Tabla de Posiciones" del storyboard al terminar el juego.
-     */
+    public void mostrarMensaje(String mensaje) {
+        actualizarTextoEstado(mensaje);
+    }
+
     public void mostrarTablaPosiciones(String resumen) {
         JOptionPane.showMessageDialog(this, resumen, "Tabla de Posiciones - Fin del Juego", JOptionPane.PLAIN_MESSAGE);
     }
@@ -331,18 +332,21 @@ public class VistaJuego extends JFrame {
         g.setColor(Color.LIGHT_GRAY);
         g.fillRect(0, 0, w, h);
 
+        int casaAncho = w / 3;
+        int casaAlto = h / 3;
+
         // Casas esquineras
         g.setColor(coloresLocales.get(1)); // Rojo (Arriba Izq)
-        g.fillRect(15, 15, w / 3, h / 3);
+        g.fillRect(15, 15, casaAncho, casaAlto);
 
         g.setColor(coloresLocales.get(2)); // Azul (Arriba Der)
-        g.fillRect(w - w / 3 - 15, 15, w / 3, h / 3);
+        g.fillRect(w - casaAncho - 15, 15, casaAncho, casaAlto);
 
         g.setColor(coloresLocales.get(3)); // Verde (Abajo Izq)
-        g.fillRect(15, h - h / 3 - 15, w / 3, h / 3);
+        g.fillRect(15, h - casaAlto - 15, casaAncho, casaAlto);
 
         g.setColor(coloresLocales.get(4)); // Amarillo (Abajo Der)
-        g.fillRect(w - w / 3 - 15, h - h / 3 - 15, w / 3, h / 3);
+        g.fillRect(w - casaAncho - 15, h - casaAlto - 15, casaAncho, casaAlto);
 
         // Triángulo central (Meta)
         g.setColor(Color.DARK_GRAY);

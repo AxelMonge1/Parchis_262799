@@ -16,11 +16,9 @@ public class ControladorJuego {
     private Set<Integer> jugadoresListos = new HashSet<>();
     private static final int CAPACIDAD_MAXIMA_SALA = 4;
 
-    public ControladorJuego(GestorRed gestorRed) {
-        this.gestorRed = gestorRed;
-    }
-
-    // Constructor para inyectar las dependencias
+    /**
+     * Constructor principal con inyección de dependencias completa.
+     */
     public ControladorJuego(ModeloJuego modelo, VistaJuego vista, GestorRed gestorRed) {
         this.modelo = modelo;
         this.vista = vista;
@@ -34,22 +32,25 @@ public class ControladorJuego {
     }
 
     /**
-     * Inicia el ciclo principal del juego.
-     */
-    public void iniciarJuego() {
-        // Inicializa el estado y lo transmite a los demás jugadores
-        notificarCambioEstado();
-    }
-
-    /**
      * Se ejecuta cuando el jugador presiona el botón de lanzar dado en la Vista.
      */
     public void procesarTiradaDado() {
-        // 1. Ejecutar la lógica local de la tirada
-        int resultado = modelo.getDado().lanzar();
-        vista.mostrarResultadoDado(resultado);
+        // 1. Validar turno local
+        int idLocal = gestorRed.getIdJugadorLocal();
+        if (modelo.getTurnoActual() != idLocal) {
+            System.out.println("No es tu turno para lanzar el dado.");
+            return;
+        }
 
-        // 2. 📍 Transmitir el nuevo estado a los demás jugadores
+        // 2. Ejecutar la tirada en el modelo
+        int resultado = modelo.getDado().lanzar();
+        System.out.println("Jugador " + idLocal + " lanzó el dado: " + resultado);
+
+        // 3. Actualizar la vista local y deshabilitar el botón temporalmente
+        vista.mostrarResultadoDado(resultado);
+        vista.setBotonDadoHabilitado(false);
+
+        // 4. Transmitir el nuevo estado a los demás jugadores
         transmitirCambioEstadoLocal();
     }
 
@@ -81,7 +82,7 @@ public class ControladorJuego {
     public void transmitirCambioEstadoLocal() {
         String estadoSerializado = modelo.obtenerEstadoSerializado();
 
-        // 📍 Filtro de seguridad: No transmitir nada si la partida no ha comenzado o el estado es nulo
+        // Filtro de seguridad: No transmitir nada si la partida no ha comenzado o el estado es nulo
         if (estadoSerializado == null || estadoSerializado.trim().isEmpty() || "null".equalsIgnoreCase(estadoSerializado)) {
             return;
         }
@@ -105,6 +106,12 @@ public class ControladorJuego {
     public void aplicarSincronizacionRemota(String datosEstado) {
         modelo.actualizarDesdeRed(datosEstado);
         vista.renderizarTablero();
+
+        // Actualizar disponibilidad del botón de dado tras cambio de estado
+        int turnoActual = modelo.getTurnoActual();
+        int miIdLocal = gestorRed.getIdJugadorLocal();
+        vista.mostrarTurnoActual(turnoActual);
+        vista.setBotonDadoHabilitado(miIdLocal == turnoActual);
     }
 
     private void verificarInicioPartida() {
@@ -128,13 +135,12 @@ public class ControladorJuego {
     public void presionarBotonListo() {
         int miId = gestorRed.getIdJugadorLocal();
 
-        // Evitar enviar el paquete si el cliente aún no ha recibido su ID del Host
         if (miId == 0) {
             System.err.println("Aún no se ha asignado un ID de jugador para esta conexión.");
             return;
         }
 
-        // 1. Armar paquete de lobby
+        // 1. Armar paquete de confirmación de lobby
         PaqueteRed paquete = new PaqueteRed(
                 TipoPaquete.LOBBY_CONFIRM,
                 miId,
@@ -145,10 +151,8 @@ public class ControladorJuego {
         if (gestorRed.isEsHost()) {
             procesarJugadorListo(miId);
             gestorRed.enviarPaqueteATodos(paquete);
-        } else {
-            if (!gestorRed.getConexiones().isEmpty()) {
-                gestorRed.getConexiones().get(0).enviarPaquete(paquete);
-            }
+        } else if (!gestorRed.getConexiones().isEmpty()) {
+            gestorRed.getConexiones().get(0).enviarPaquete(paquete);
         }
     }
 
@@ -156,9 +160,7 @@ public class ControladorJuego {
         int miId = gestorRed.getIdJugadorLocal();
         int turnoInicial = 1;
 
-        // Antes se manipulaban btnDado y btnAccionLobby directamente aquí; ahora solo se ordena a la vista
         vista.prepararInterfazParaInicio(miId, turnoInicial);
-
         System.out.println("¡Partida Iniciada! ID Local: " + miId);
     }
 
@@ -181,14 +183,10 @@ public class ControladorJuego {
         if (movimientoExitoso) {
             // 4. Aplicar reglas de repetición de turno o cambio de turno
             if (modelo.getPasosExtraPendientes() > 0) {
-                // Hay pasos extra pendientes (ej: +20 por comer, +10 por llegada).
-                // Se conserva el turno del jugador actual para que use su bonificación.
                 System.out.println("Jugador " + idJugador + " conserva turno por pasos extra pendientes.");
             } else if (pasos == 6) {
-                // Sacar un 6 otorga repetición de tiro
                 System.out.println("Jugador " + idJugador + " repite turno por haber sacado 6.");
             } else {
-                // Si no hay recompensas ni sacó 6, pasa el turno al siguiente jugador
                 modelo.cambiarTurno();
             }
         } else {
@@ -196,39 +194,17 @@ public class ControladorJuego {
             return;
         }
 
-        // 5. Actualizar la interfaz gráfica (Vista)
+        // 5. Actualizar la interfaz gráfica
         vista.renderizarTablero();
 
         int turnoActual = modelo.getTurnoActual();
         int miIdLocal = gestorRed.getIdJugadorLocal();
 
-        // Habilitar el botón de lanzar dado solo si es el turno de esta computadora
         vista.mostrarTurnoActual(turnoActual);
         vista.setBotonDadoHabilitado(miIdLocal == turnoActual);
 
-        // 6. Transmitir el estado actualizado a los demás jugadores por la red
+        // 6. Transmitir el estado actualizado a los demás jugadores
         transmitirCambioEstadoLocal();
-    }
-
-    /**
-     * Actualiza la vista local y empaqueta el estado para enviarlo por red a los clientes.
-     */
-    public void notificarCambioEstado() {
-        // 1. Actualizar la vista local[cite: 4]
-        if (vista != null) {
-            vista.actualizarFichas(); //[cite: 4]
-            // vista.mostrarTurnoActual(modelo.getTurnoActual());
-        }
-
-        // 2. Broadcast del estado por la red[cite: 5]
-        if (gestorRed != null) {
-            // Crea un paquete de tipo SYNC_ESTADO según el diagrama de red[cite: 4, 5]
-            PaqueteRed paquete = new PaqueteRed();
-            paquete.setTipo(TipoPaquete.SYNC_ESTADO); //[cite: 4, 5]
-
-            // El Gestor de Red itera sus conexiones TCP y envía el paquete a todos[cite: 4, 5]
-            gestorRed.enviarPaqueteATodos(paquete); //[cite: 4]
-        }
     }
 
     public ModeloJuego getModelo() { return modelo; }
