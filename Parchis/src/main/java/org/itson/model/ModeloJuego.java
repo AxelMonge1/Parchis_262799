@@ -5,29 +5,25 @@ import java.util.Map;
 
 public class ModeloJuego {
     private int turnoActual = 1;
-    private int totalJugadores = 4; // Se ajusta dinámicamente según la red
+    private int totalJugadores = 4;
     private boolean dadoLanzado = false;
-    private int numSalida = 5; // Número requerido para salir de casa (Configurable)
+    private int numSalida = 5;
     private int pasosExtraPendientes = 0;
     private Dado dado;
 
-    // Estructura: JugadorID (1..4) -> (FichaID 1..4 -> Posicion)
-    // Posición: -1 = EN_CASA | 1..68 = CASILLAS TABLERO
     private Map<Integer, Map<Integer, Integer>> posicionesFichas;
 
-    // Casillas de salida según el tablero clásico de Parchís
     private static final Map<Integer, Integer> CASILLAS_SALIDA = Map.of(
-            1, 39, // Jugador 1 (Rojo)
-            2, 22, // Jugador 2 (Azul)
-            3, 56, // Jugador 3 (Verde)
-            4, 5   // Jugador 4 (Amarillo)
+            1, 39,
+            2, 22,
+            3, 56,
+            4, 5
     );
 
     public ModeloJuego() {
         this.dado = new Dado();
         this.posicionesFichas = new HashMap<>();
 
-        // Inicializar 4 fichas en CASA (-1) para los 4 jugadores
         for (int j = 1; j <= 4; j++) {
             Map<Integer, Integer> fichas = new HashMap<>();
             for (int f = 1; f <= 4; f++) {
@@ -37,9 +33,6 @@ public class ModeloJuego {
         }
     }
 
-    /**
-     * Evalúa si una ficha específica se puede mover con el dado actual.
-     */
     public boolean puedeMoverFicha(int idJugador, int idFicha) {
         if (!dadoLanzado || idJugador != turnoActual) {
             return false;
@@ -53,18 +46,13 @@ public class ModeloJuego {
         int posActual = fichasJugador.get(idFicha);
         int valorDado = dado.getValorActual();
 
-        // 1. Si la ficha está EN CASA (-1), solo sale si el dado equivale a numSalida
         if (posActual == -1) {
             return valorDado == numSalida;
         }
 
-        // 2. Si la ficha ya está en el tablero, puede avanzar
         return posActual > 0;
     }
 
-    /**
-     * Revisa si el jugador en turno tiene AL MENOS UN movimiento válido.
-     */
     public boolean tieneMovimientosValidos(int idJugador) {
         if (!dadoLanzado) return false;
 
@@ -79,9 +67,6 @@ public class ModeloJuego {
         return false;
     }
 
-    /**
-     * Ejecuta el movimiento de la ficha en el modelo.
-     */
     public boolean moverFicha(int idFicha, int pasos) {
         if (!puedeMoverFicha(turnoActual, idFicha)) {
             return false;
@@ -91,12 +76,10 @@ public class ModeloJuego {
         int posActual = fichasJugador.get(idFicha);
 
         if (posActual == -1) {
-            // Salida de casa a la casilla asignada por color
             int casillaSalida = CASILLAS_SALIDA.getOrDefault(turnoActual, 1);
             fichasJugador.put(idFicha, casillaSalida);
             System.out.println("Ficha " + idFicha + " del Jugador " + turnoActual + " SALIÓ a la casilla " + casillaSalida);
         } else {
-            // Avanzar casillas (recorrido circular de 1 a 68)
             int nuevaPos = posActual + pasos;
             if (nuevaPos > 68) {
                 nuevaPos = ((nuevaPos - 1) % 68) + 1;
@@ -105,13 +88,10 @@ public class ModeloJuego {
             System.out.println("Ficha " + idFicha + " del Jugador " + turnoActual + " avanzó a la casilla " + nuevaPos);
         }
 
-        this.dadoLanzado = false; // Consumir el dado
+        this.dadoLanzado = false;
         return true;
     }
 
-    /**
-     * Rotación dinámica del turno considerando solo los jugadores activos/conectados.
-     */
     public void cambiarTurno() {
         this.dadoLanzado = false;
         this.pasosExtraPendientes = 0;
@@ -119,8 +99,6 @@ public class ModeloJuego {
         this.turnoActual = (this.turnoActual % limiteJugadores) + 1;
         System.out.println("Turno cambiado -> Ahora es turno del Jugador " + this.turnoActual + " (Total jugadores: " + limiteJugadores + ")");
     }
-
-    // --- SERIALIZACIÓN DE ESTADO PARA LA RED ---
 
     public String obtenerEstadoSerializado() {
         StringBuilder sb = new StringBuilder();
@@ -190,7 +168,6 @@ public class ModeloJuego {
         }
     }
 
-    // --- CLASE INTERNA AUXILIAR DEL DADO ---
     public static class Dado {
         private int valorActual = 0;
 
@@ -203,7 +180,6 @@ public class ModeloJuego {
         public void setValorActual(int valor) { this.valorActual = valor; }
     }
 
-    // --- GETTERS Y SETTERS ---
     public int getTurnoActual() { return turnoActual; }
     public void setTurnoActual(int turnoActual) { this.turnoActual = turnoActual; }
     public int getTotalJugadores() { return totalJugadores; }

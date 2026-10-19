@@ -28,32 +28,25 @@ public class ControladorJuego {
         return gestorRed.getConexiones().size() + 1;
     }
 
-    /**
-     * Invocado cuando el jugador presiona el botón de lanzar dado.
-     */
     public void procesarTiradaDado() {
         int idLocal = gestorRed.getIdJugadorLocal();
 
-        // 1. Validar que sea el turno local
         if (modelo.getTurnoActual() != idLocal) {
             vista.mostrarMensaje("No es tu turno para lanzar el dado.");
             return;
         }
 
-        // 2. Validar que no haya tirado previamente en este turno
         if (modelo.isDadoLanzado()) {
             vista.mostrarMensaje("Ya lanzaste el dado. Debes seleccionar una ficha.");
             return;
         }
 
-        // 3. Lanzar dado
         int resultado = modelo.getDado().lanzar();
         modelo.setDadoLanzado(true);
 
         System.out.println("Jugador " + idLocal + " lanzó el dado: " + resultado);
         vista.mostrarResultadoDado(resultado);
 
-        // 4. Verificar si tiene movimientos válidos
         if (!modelo.tieneMovimientosValidos(idLocal)) {
             vista.mostrarMensaje("Sin movimientos válidos con un " + resultado + ". Pasa el turno.");
 
@@ -67,24 +60,18 @@ public class ControladorJuego {
             return;
         }
 
-        // 5. Si tiene movimientos válidos, deshabilita el botón de dado hasta que mueva una ficha
         vista.setBotonDadoHabilitado(false);
         transmitirCambioEstadoLocal();
     }
 
-    /**
-     * Invocado cuando el jugador selecciona/hace clic sobre una de sus fichas.
-     */
     public void procesarAccionJugador(int idJugador, int idFicha) {
         int miIdLocal = gestorRed.getIdJugadorLocal();
 
-        // 1. Validar turno local y del modelo
         if (idJugador != modelo.getTurnoActual() || idJugador != miIdLocal) {
             System.out.println("Intento de movimiento fuera de turno.");
             return;
         }
 
-        // 2. Validar que primero haya tirado el dado
         if (!modelo.isDadoLanzado()) {
             vista.mostrarMensaje("Debes lanzar el dado antes de mover una ficha.");
             return;
@@ -92,11 +79,9 @@ public class ControladorJuego {
 
         int pasos = modelo.getDado().getValorActual();
 
-        // 3. Intentar realizar el movimiento en el modelo
         boolean movimientoExitoso = modelo.moverFicha(idFicha, pasos);
 
         if (movimientoExitoso) {
-            // Regla del 6: Otorga repetición de lanzamiento
             if (pasos == 6) {
                 modelo.setDadoLanzado(false);
                 vista.mostrarMensaje("¡Sacaste 6! Vuelves a lanzar el dado.");
@@ -108,20 +93,15 @@ public class ControladorJuego {
             return;
         }
 
-        // 4. Actualizar Interfaz Gráfica
         vista.renderizarTablero();
         int turnoActual = modelo.getTurnoActual();
 
         vista.mostrarTurnoActual(turnoActual);
         vista.setBotonDadoHabilitado(miIdLocal == turnoActual);
 
-        // 5. Transmitir el nuevo estado por la red
         transmitirCambioEstadoLocal();
     }
 
-    /**
-     * Emite el estado serializado del modelo hacia los demás clientes.
-     */
     public void transmitirCambioEstadoLocal() {
         String estadoSerializado = modelo.obtenerEstadoSerializado();
 
@@ -142,9 +122,6 @@ public class ControladorJuego {
         }
     }
 
-    /**
-     * Recibe la sincronización remota y actualiza el estado local.
-     */
     public void aplicarSincronizacionRemota(String datosEstado) {
         modelo.actualizarDesdeRed(datosEstado);
 
@@ -158,8 +135,6 @@ public class ControladorJuego {
             vista.setBotonDadoHabilitado(miIdLocal == turnoActual);
         });
     }
-
-    // --- MÉTODOS DE LOBBY Y RED ---
 
     public synchronized void presionarBotonListo() {
         int miId = gestorRed.getIdJugadorLocal();
@@ -246,7 +221,6 @@ public class ControladorJuego {
         System.out.println("¡Partida Iniciada! Mi ID: " + miId + " | Jugadores en Sala: " + conectados + " | Turno Inicial: " + turnoInicial);
     }
 
-    // --- GETTERS Y SETTERS ---
     public ModeloJuego getModelo() { return modelo; }
     public void setModelo(ModeloJuego modelo) { this.modelo = modelo; }
     public VistaJuego getVista() { return vista; }

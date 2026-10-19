@@ -24,13 +24,11 @@ public class VistaJuego extends JFrame {
     public static final String PANTALLA_UNIRSE = "UNIRSE";
     public static final String PANTALLA_JUEGO = "JUEGO";
 
-    // Subpaneles
     private JPanel panelMenu;
     private JPanel panelCrearPartida;
     private JPanel panelUnirsePartida;
     private JPanel panelTableroJuego;
 
-    // Componentes UI
     private JButton btnCrearPartidaMenu;
     private JButton btnUnirsePartidaMenu;
 
@@ -50,10 +48,7 @@ public class VistaJuego extends JFrame {
     private JButton btnAccionLobby;
     private JLabel lblEstado;
 
-    // Hitboxes de clic en fichas
     private final List<FichaHitbox> fichasHitboxes = new ArrayList<>();
-
-    // Coordenadas 19x19 de las 68 casillas del tablero
     private static final int[][] POS_CASILLAS = new int[69][2];
 
     static {
@@ -62,8 +57,6 @@ public class VistaJuego extends JFrame {
 
     public VistaJuego() {
         this.coloresLocales = new HashMap<>();
-
-        // Colores distintivos (1: Rojo, 2: Azul, 3: Verde, 4: Amarillo)
         coloresLocales.put(1, new Color(225, 40, 40));
         coloresLocales.put(2, new Color(40, 145, 235));
         coloresLocales.put(3, new Color(95, 185, 55));
@@ -99,7 +92,6 @@ public class VistaJuego extends JFrame {
         mostrarPantalla(PANTALLA_MENU);
     }
 
-    // --- 1. MENÚ PRINCIPAL ---
     private void crearPanelMenu() {
         panelMenu = new JPanel(new GridBagLayout());
         panelMenu.setBackground(new Color(110, 40, 200));
@@ -131,7 +123,6 @@ public class VistaJuego extends JFrame {
         panelMenu.add(container);
     }
 
-    // --- 2. CREAR PARTIDA ---
     private void crearPanelCrearPartida() {
         panelCrearPartida = new JPanel(new GridBagLayout());
         panelCrearPartida.setBackground(new Color(110, 40, 200));
@@ -173,7 +164,6 @@ public class VistaJuego extends JFrame {
         panelCrearPartida.add(form);
     }
 
-    // --- 3. UNIRSE A PARTIDA ---
     private void crearPanelUnirsePartida() {
         panelUnirsePartida = new JPanel(new GridBagLayout());
         panelUnirsePartida.setBackground(new Color(110, 40, 200));
@@ -203,7 +193,6 @@ public class VistaJuego extends JFrame {
         panelUnirsePartida.add(form);
     }
 
-    // --- 4. TABLERO DE JUEGO (LOBBY Y PARTIDA) ---
     private void crearPanelTableroJuego() {
         panelTableroJuego = new JPanel(new BorderLayout());
         panelTableroJuego.setBackground(new Color(110, 40, 200));
@@ -218,7 +207,6 @@ public class VistaJuego extends JFrame {
         panelTableroRender.setPreferredSize(new Dimension(480, 480));
         panelTableroRender.setBackground(Color.WHITE);
 
-        // DETECTOR DE CLICS SOBRE FICHAS
         panelTableroRender.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -227,7 +215,6 @@ public class VistaJuego extends JFrame {
 
                 for (FichaHitbox hb : fichasHitboxes) {
                     if (hb.contains(mx, my)) {
-                        System.out.println("Ficha seleccionada: Jugador " + hb.idJugador + ", Ficha " + hb.idFicha);
                         if (controlador != null) {
                             controlador.procesarAccionJugador(hb.idJugador, hb.idFicha);
                         }
@@ -280,14 +267,12 @@ public class VistaJuego extends JFrame {
         panelTableroJuego.add(panelInferior, BorderLayout.PAGE_END);
     }
 
-    // --- RENDERIZADO GRÁFICO DINÁMICO ---
-
     private void dibujarTableroGrafico(Graphics g) {
         Graphics2D g2 = (Graphics2D) g;
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
 
-        fichasHitboxes.clear(); // Reiniciar hitboxes dinámicas
+        fichasHitboxes.clear();
 
         int w = panelTableroRender.getWidth();
         int h = panelTableroRender.getHeight();
@@ -304,29 +289,23 @@ public class VistaJuego extends JFrame {
         Color colorAmarillo = coloresLocales.get(4);
         Color colorBorde = new Color(100, 50, 20);
 
-        // 1. Fondo blanco
         g2.setColor(Color.WHITE);
         g2.fillRect(offsetX, offsetY, size, size);
 
-        // 2. Dibujar Casas Esquineras
         dibujarCasa(g2, offsetX, offsetY, u, 0, 0, colorRojo, 1);
         dibujarCasa(g2, offsetX, offsetY, u, 11, 0, colorAzul, 2);
         dibujarCasa(g2, offsetX, offsetY, u, 0, 11, colorVerde, 3);
         dibujarCasa(g2, offsetX, offsetY, u, 11, 11, colorAmarillo, 4);
 
-        // 3. Dibujar Meta Central
         dibujarMetaCentral(g2, offsetX, offsetY, u, colorRojo, colorAzul, colorAmarillo, colorVerde);
 
-        // 4. Dibujar Alas/Pasillos
         dibujarAlaSuperior(g2, offsetX, offsetY, u, colorRojo);
         dibujarAlaDerecha(g2, offsetX, offsetY, u, colorAzul);
         dibujarAlaInferior(g2, offsetX, offsetY, u, colorAmarillo);
         dibujarAlaIzquierda(g2, offsetX, offsetY, u, colorVerde);
 
-        // 5. Dibujar Fichas en el Recorrido del Tablero (Posiciones > 0)
         dibujarFichasModelo(g2, offsetX, offsetY, u);
 
-        // 6. Marco exterior
         g2.setColor(colorBorde);
         g2.setStroke(new BasicStroke(4f));
         g2.drawRect(offsetX, offsetY, size, size);
@@ -361,16 +340,14 @@ public class VistaJuego extends JFrame {
         g2.setColor(Color.BLACK);
         g2.drawOval(cx - rCenter, cy - rCenter, rCenter * 2, rCenter * 2);
 
-        // 4 slots para las 4 fichas en casa
         double dist = 1.6 * u;
         int[][] posSlots = {
-                {(int) Math.round(-dist * 0.707), (int) Math.round(-dist * 0.707)}, // Ficha 1
-                {(int) Math.round(dist * 0.707), (int) Math.round(-dist * 0.707)},  // Ficha 2
-                {(int) Math.round(-dist * 0.707), (int) Math.round(dist * 0.707)},  // Ficha 3
-                {(int) Math.round(dist * 0.707), (int) Math.round(dist * 0.707)}   // Ficha 4
+                {(int) Math.round(-dist * 0.707), (int) Math.round(-dist * 0.707)},
+                {(int) Math.round(dist * 0.707), (int) Math.round(-dist * 0.707)},
+                {(int) Math.round(-dist * 0.707), (int) Math.round(dist * 0.707)},
+                {(int) Math.round(dist * 0.707), (int) Math.round(dist * 0.707)}
         };
 
-        // Pintar slots vacíos (círculos blancos)
         int rSlot = (int) Math.round(0.45 * u);
         for (int[] p : posSlots) {
             int sx = cx + p[0];
@@ -382,7 +359,6 @@ public class VistaJuego extends JFrame {
             g2.drawOval(sx - rSlot, sy - rSlot, rSlot * 2, rSlot * 2);
         }
 
-        // Pintar fichas que estén REALMENTE EN CASA (Posición -1)
         if (modelo != null && modelo.getPosicionesFichas().containsKey(idJugador)) {
             Map<Integer, Integer> fichas = modelo.getPosicionesFichas().get(idJugador);
             for (int f = 1; f <= 4; f++) {
@@ -394,7 +370,6 @@ public class VistaJuego extends JFrame {
                 }
             }
         } else {
-            // Renderizado por defecto antes de iniciar
             for (int f = 1; f <= 4; f++) {
                 int sx = cx + posSlots[f - 1][0];
                 int sy = cy + posSlots[f - 1][1];
@@ -412,14 +387,12 @@ public class VistaJuego extends JFrame {
             if (fichas == null) return;
 
             fichas.forEach((idFicha, pos) -> {
-                // Si la ficha está en el tablero (1..68)
                 if (pos != null && pos >= 1 && pos <= 68) {
                     int[] gridCoords = POS_CASILLAS[pos];
                     if (gridCoords != null) {
                         int gridX = gridCoords[0];
                         int gridY = gridCoords[1];
 
-                        // Desplazamiento sutil si hay múltiples fichas en la misma casilla
                         int count = ocupacionCasillas.getOrDefault(pos, 0);
                         ocupacionCasillas.put(pos, count + 1);
 
@@ -439,25 +412,20 @@ public class VistaJuego extends JFrame {
         int r = (int) Math.round(u * 0.42);
         Color colorJugador = coloresLocales.getOrDefault(idJugador, Color.RED);
 
-        // Sombra 3D
         g2.setColor(new Color(0, 0, 0, 70));
         g2.fillOval(cx - r + 2, cy - r + 2, r * 2, r * 2);
 
-        // Relleno principal
         g2.setColor(colorJugador);
         g2.fillOval(cx - r, cy - r, r * 2, r * 2);
 
-        // Anillo interior blanco
         g2.setColor(Color.WHITE);
         g2.setStroke(new BasicStroke(2.0f));
         g2.drawOval(cx - r + 3, cy - r + 3, (r - 3) * 2, (r - 3) * 2);
 
-        // Borde exterior negro
         g2.setColor(Color.BLACK);
         g2.setStroke(new BasicStroke(1.8f));
         g2.drawOval(cx - r, cy - r, r * 2, r * 2);
 
-        // Número de ficha
         g2.setColor(Color.WHITE);
         g2.setFont(new Font("Arial", Font.BOLD, Math.max(10, (int) (u * 0.38))));
         FontMetrics fm = g2.getFontMetrics();
@@ -466,7 +434,6 @@ public class VistaJuego extends JFrame {
         int ty = cy + (fm.getAscent() - fm.getDescent()) / 2;
         g2.drawString(txt, tx, ty);
 
-        // Registrar Hitbox interactiva
         fichasHitboxes.add(new FichaHitbox(idJugador, idFicha, cx, cy, r));
     }
 
@@ -616,8 +583,6 @@ public class VistaJuego extends JFrame {
         }
     }
 
-    // --- MÉTODOS DE LA VISTA ---
-
     public void renderizarTablero() {
         if (panelTableroRender != null) {
             panelTableroRender.repaint();
@@ -688,8 +653,6 @@ public class VistaJuego extends JFrame {
         JOptionPane.showMessageDialog(this, resumen, "Tabla de Posiciones - Fin del Juego", JOptionPane.PLAIN_MESSAGE);
     }
 
-    // --- MÉTODOS AUXILIARES ---
-
     public void mostrarPantalla(String nombrePantalla) {
         cardLayout.show(panelContenedor, nombrePantalla);
     }
@@ -719,9 +682,7 @@ public class VistaJuego extends JFrame {
     }
 
     public void setBotonDadoHabilitado(boolean habilitado) {
-        SwingUtilities.invokeLater(() -> {
-            btnDado.setEnabled(habilitado);
-        });
+        SwingUtilities.invokeLater(() -> btnDado.setEnabled(habilitado));
     }
 
     private static void inicializarCoordenadasCasillas() {
@@ -741,7 +702,6 @@ public class VistaJuego extends JFrame {
         }
     }
 
-    // CLASE INTERNA HITBOX
     private static class FichaHitbox {
         int idJugador;
         int idFicha;
@@ -762,7 +722,6 @@ public class VistaJuego extends JFrame {
         }
     }
 
-    // GETTERS Y SETTERS
     public void setControlador(ControladorJuego controlador) { this.controlador = controlador; }
     public JButton getBtnCrearPartidaMenu() { return btnCrearPartidaMenu; }
     public JButton getBtnUnirsePartidaMenu() { return btnUnirsePartidaMenu; }

@@ -10,10 +10,6 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Administra las conexiones de red TCP, distingue roles (Host/Cliente),
- * emite latidos (HEARTBEAT) periódicos y enruta los paquetes hacia el Controlador.
- */
 public class GestorRed {
 
     private ServerSocket serverSocket;
@@ -31,13 +27,10 @@ public class GestorRed {
         this.activo = true;
     }
 
-    /**
-     * Inicializa la máquina actual como Host (Servidor) e inicia la escucha.
-     */
     public boolean iniciarServidor(int puerto) {
         this.esHost = true;
         this.puertoEscucha = puerto;
-        this.idJugadorLocal = 1; // El Host siempre es el Jugador 1
+        this.idJugadorLocal = 1;
         this.activo = true;
 
         new Thread(this::escucharConexiones).start();
@@ -45,9 +38,6 @@ public class GestorRed {
         return true;
     }
 
-    /**
-     * Conecta la máquina actual como Cliente al Host remoto.
-     */
     public boolean conectarAHost(String ip, int puerto) {
         this.esHost = false;
         this.activo = true;
@@ -68,10 +58,6 @@ public class GestorRed {
         }
     }
 
-    /**
-     * Bucle del servidor que acepta nuevos clientes, les asigna un ID
-     * y notifica al controlador para evaluar capacidad de la sala.
-     */
     public void escucharConexiones() {
         try {
             this.serverSocket = new ServerSocket(puertoEscucha);
@@ -84,13 +70,12 @@ public class GestorRed {
                 int idAsignado;
                 synchronized (conexiones) {
                     conexiones.add(nuevaConexion);
-                    idAsignado = conexiones.size() + 1; // Host=1, Clientes=2, 3, 4
+                    idAsignado = conexiones.size() + 1;
                     nuevaConexion.setIdJugadorAsociado(idAsignado);
                 }
 
                 procesarPaquetesEntrantes(nuevaConexion);
 
-                // Notifica al cliente conectado cuál es su ID asignado
                 PaqueteRed paqueteId = new PaqueteRed(
                         TipoPaquete.LOBBY_CONFIRM,
                         1,
@@ -111,9 +96,6 @@ public class GestorRed {
         }
     }
 
-    /**
-     * Escucha y enruta los paquetes entrantes de una conexión TCP en un hilo dedicado.
-     */
     public void procesarPaquetesEntrantes(ConexionTCP conexion) {
         new Thread(() -> {
             try {
@@ -121,13 +103,11 @@ public class GestorRed {
                     PaqueteRed paquete = conexion.recibirPaquete();
 
                     if (paquete == null) {
-                        break; // Socket cerrado o desconectado
+                        break;
                     }
 
-                    // 1. Renueva el timestamp de vida con cualquier paquete recibido
                     conexion.setUltimoHeartbeat(System.currentTimeMillis());
 
-                    // 2. Respuesta automática a Heartbeats (PING -> PONG) a nivel de red
                     if (paquete.getTipo() == TipoPaquete.HEARTBEAT) {
                         if ("PING".equalsIgnoreCase(paquete.getMensaje())) {
                             conexion.enviarPaquete(new PaqueteRed(
@@ -141,7 +121,6 @@ public class GestorRed {
 
                     String mensaje = paquete.getMensaje();
 
-                    // 3. Registro de ID asignado al cliente
                     if (paquete.getTipo() == TipoPaquete.LOBBY_CONFIRM
                             && mensaje != null && mensaje.startsWith("ASIGNAR_ID:")) {
                         int miId = Integer.parseInt(mensaje.split(":")[1]);
@@ -149,7 +128,6 @@ public class GestorRed {
                         System.out.println("ID asignado por el Host: Jugador " + miId);
                     }
 
-                    // 4. Delegación de reglas y acciones al ControladorJuego
                     if (controlador != null && mensaje != null) {
                         try {
                             switch (paquete.getTipo()) {
@@ -199,9 +177,6 @@ public class GestorRed {
         }).start();
     }
 
-    /**
-     * Emite un paquete a todas las conexiones TCP activas.
-     */
     public void enviarPaqueteATodos(PaqueteRed paquete) {
         synchronized (conexiones) {
             for (ConexionTCP conexion : conexiones) {
@@ -212,18 +187,12 @@ public class GestorRed {
         }
     }
 
-    /**
-     * Remueve una conexión inactiva de la lista compartida.
-     */
     public void removerConexion(ConexionTCP conexion) {
         synchronized (conexiones) {
             conexiones.remove(conexion);
         }
     }
 
-    /**
-     * Hilo en segundo plano que envía un paquete PING cada 2 segundos.
-     */
     public void iniciarEmisorHeartbeat() {
         new Thread(() -> {
             while (activo) {
@@ -245,9 +214,6 @@ public class GestorRed {
         }).start();
     }
 
-    /**
-     * Apaga el servidor y cierra todas las conexiones.
-     */
     public void cerrarServidor() {
         this.activo = false;
         this.esHost = false;
@@ -265,8 +231,6 @@ public class GestorRed {
             System.err.println("Error al cerrar ServerSocket: " + e.getMessage());
         }
     }
-
-    // --- Getters y Setters ---
 
     public boolean isEsHost() {
         return esHost;

@@ -1,4 +1,5 @@
 package org.itson.conection;
+
 import org.itson.conection.auxiliar.PaqueteRed;
 import org.itson.conection.auxiliar.TipoPaquete;
 
@@ -8,10 +9,6 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 
-/**
- * Encapsula un socket TCP individual junto con sus flujos de entrada y salida,
- * la lógica de serialización/deserialización y el estado de salud de la conexión.
- */
 public class ConexionTCP {
 
     private Socket socket;
@@ -28,30 +25,23 @@ public class ConexionTCP {
         this.ultimoHeartbeat = System.currentTimeMillis();
 
         try {
-            // Configuración del flujo de entrada (lectura) y salida (escritura)
             this.in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            this.out = new PrintWriter(socket.getOutputStream(), true); // true = autoFlush
+            this.out = new PrintWriter(socket.getOutputStream(), true);
         } catch (IOException e) {
             System.err.println("Error al inicializar flujos I/O en socket: " + e.getMessage());
             cerrarConexion();
         }
     }
 
-    /**
-     * Envía un paquete serializado a través del socket asegurando su salida inmediata.
-     */
     public synchronized void enviarPaquete(PaqueteRed paquete) {
         if (estaActivo && out != null && paquete != null) {
             String dato = paquete.serializar();
             System.out.println("Enviando paquete: " + dato);
             out.println(dato);
-            out.flush(); // Forzado de envío directo por la red
+            out.flush();
         }
     }
 
-    /**
-     * Lee de forma bloqueante una línea enviada por la otra computadora.
-     */
     public PaqueteRed recibirPaquete() {
         try {
             if (in != null && estaActivo) {
@@ -63,19 +53,14 @@ public class ConexionTCP {
                 }
             }
         } catch (IOException e) {
-            // Captura interrupciones físicas o cierres de socket
         }
         return null;
     }
 
-    /**
-     * Convierte el texto delimitado por punto y coma (TIPO;ID;MENSAJE) a PaqueteRed.
-     */
     public PaqueteRed deserializar(String dato) {
         try {
             if (dato == null || dato.trim().isEmpty()) return null;
 
-            // Límite de 3 partes para conservar puntos y comas internos dentro del mensaje
             String[] partes = dato.split(";", 3);
             if (partes.length < 3) return null;
 
@@ -90,9 +75,6 @@ public class ConexionTCP {
         }
     }
 
-    /**
-     * Libera recursos y cierra los flujos I/O del socket.
-     */
     public void cerrarConexion() {
         this.estaActivo = false;
         try {
@@ -103,8 +85,6 @@ public class ConexionTCP {
             System.err.println("Error al cerrar conexión TCP: " + e.getMessage());
         }
     }
-
-    // --- Getters y Setters ---
 
     public boolean isEstaActivo() {
         return estaActivo;

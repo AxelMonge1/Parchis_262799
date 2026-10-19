@@ -6,34 +6,31 @@ import org.itson.controller.ControladorJuego;
 import org.itson.model.ModeloJuego;
 import org.itson.view.VistaJuego;
 
-import javax.swing.*;
+import javax.swing.SwingUtilities;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 
 public class Main {
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
-
-            // 1. Instanciar los componentes centrales de la arquitectura
             ModeloJuego modelo = new ModeloJuego();
             VistaJuego vista = new VistaJuego();
             GestorRed gestorRed = new GestorRed();
 
-            // 2. Instanciar el Controlador unificado
             ControladorJuego controlador = new ControladorJuego(modelo, vista, gestorRed);
 
-            // 3. Vincular dependencias bidireccionales indispensables
             gestorRed.setControlador(controlador);
             vista.setModelo(modelo);
-            vista.setControlador(controlador); // 👈 ASIGNACIÓN CRÍTICA FALTANTE
+            vista.setControlador(controlador);
 
             GestorDesconexiones gestorDesconexiones = new GestorDesconexiones(10000, gestorRed);
 
-            // 4. Configurar eventos de la UI
             configurarEventosUI(vista, controlador, gestorRed, gestorDesconexiones);
 
-            vista.addWindowListener(new java.awt.event.WindowAdapter() {
+            vista.addWindowListener(new WindowAdapter() {
                 @Override
-                public void windowClosing(java.awt.event.WindowEvent windowEvent) {
+                public void windowClosing(WindowEvent e) {
                     if (gestorRed.isEsHost()) {
                         gestorRed.cerrarServidor();
                     }
@@ -49,7 +46,6 @@ public class Main {
                                             GestorRed gestorRed,
                                             GestorDesconexiones gestorDesconexiones) {
 
-        // --- BOTÓN: Confirmar Crear Partida (Modo Servidor / Host) ---
         vista.getBtnConfirmarCrear().addActionListener(e -> {
             String nombre = vista.getNombreUsuarioCrear();
             if (nombre.trim().isEmpty()) {
@@ -57,7 +53,6 @@ public class Main {
                 return;
             }
 
-            // Pasar la configuración elegida en la UI al modelo
             vista.getModelo().setNumSalida(vista.getNumSalidaSeleccionado());
 
             boolean servidorIniciado = gestorRed.iniciarServidor(8080);
@@ -73,7 +68,6 @@ public class Main {
             }
         });
 
-        // --- BOTÓN: Confirmar Unirse a Partida (Modo Cliente) ---
         vista.getBtnConfirmarUnirse().addActionListener(e -> {
             String ip = vista.getIpServidor();
             String nombre = vista.getNombreUsuarioUnirse();
@@ -93,14 +87,8 @@ public class Main {
             }
         });
 
-        // --- BOTÓN: Lanzar Dado ---
-        vista.getBtnDado().addActionListener(e -> {
-            controlador.procesarTiradaDado();
-        });
+        vista.getBtnDado().addActionListener(e -> controlador.procesarTiradaDado());
 
-        // --- BOTÓN: Listo / Comenzar en el Lobby ---
-        vista.getBtnAccionLobby().addActionListener(e -> {
-            controlador.presionarBotonListo();
-        });
+        vista.getBtnAccionLobby().addActionListener(e -> controlador.presionarBotonListo());
     }
 }
