@@ -11,7 +11,6 @@ import javax.swing.*;
 public class Main {
 
     public static void main(String[] args) {
-        // Ejecutar la interfaz gráfica en el Event Dispatch Thread (EDT) de Swing
         SwingUtilities.invokeLater(() -> {
 
             // 1. Instanciar los componentes centrales de la arquitectura
@@ -19,17 +18,17 @@ public class Main {
             VistaJuego vista = new VistaJuego();
             GestorRed gestorRed = new GestorRed();
 
-            // 2. Instanciar el Controlador unificado (Instancia ÚNICA)
+            // 2. Instanciar el Controlador unificado
             ControladorJuego controlador = new ControladorJuego(modelo, vista, gestorRed);
 
-            // 3. Vincular dependencias bidireccionales
+            // 3. Vincular dependencias bidireccionales indispensables
             gestorRed.setControlador(controlador);
             vista.setModelo(modelo);
+            vista.setControlador(controlador); // 👈 ASIGNACIÓN CRÍTICA FALTANTE
 
-            // Configurar gestor de desconexiones
             GestorDesconexiones gestorDesconexiones = new GestorDesconexiones(10000, gestorRed);
 
-            // 4. Configurar eventos de la interfaz
+            // 4. Configurar eventos de la UI
             configurarEventosUI(vista, controlador, gestorRed, gestorDesconexiones);
 
             vista.addWindowListener(new java.awt.event.WindowAdapter() {
@@ -41,7 +40,6 @@ public class Main {
                 }
             });
 
-            // 5. Iniciar la aplicación mostrando el menú principal
             vista.setVisible(true);
         });
     }
@@ -59,14 +57,15 @@ public class Main {
                 return;
             }
 
-            // Iniciar servidor TCP en el puerto 8080
+            // Pasar la configuración elegida en la UI al modelo
+            vista.getModelo().setNumSalida(vista.getNumSalidaSeleccionado());
+
             boolean servidorIniciado = gestorRed.iniciarServidor(8080);
 
             if (servidorIniciado) {
                 gestorDesconexiones.monitorearHeartbeat();
-                gestorDesconexiones.agregarPrioridad(1); // Host tiene prioridad 1
+                gestorDesconexiones.agregarPrioridad(1);
 
-                // Cambiar a la pantalla de lobby
                 vista.mostrarPantalla(VistaJuego.PANTALLA_JUEGO);
                 vista.mostrarMensaje("Partida creada como Host. Esperando a los demás jugadores...");
             } else {
@@ -84,7 +83,6 @@ public class Main {
                 return;
             }
 
-            // Intentar conectar al Host
             boolean conectado = gestorRed.conectarAHost(ip, 8080);
 
             if (conectado) {
@@ -102,7 +100,6 @@ public class Main {
 
         // --- BOTÓN: Listo / Comenzar en el Lobby ---
         vista.getBtnAccionLobby().addActionListener(e -> {
-            // 📍 Llama directamente a la lógica de confirmación de lobby en el controlador
             controlador.presionarBotonListo();
         });
     }
