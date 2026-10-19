@@ -16,6 +16,9 @@ public class Main {
             ModeloJuego modelo = new ModeloJuego();
             VistaJuego vista = new VistaJuego();
             GestorRed gestorRed = new GestorRed();
+            ControladorJuego controladorJuego = new ControladorJuego(modelo, vista, gestorRed);
+
+            gestorRed.setControlador(controladorJuego);
 
             // Gestor de desconexiones configurado con un timeout de 5000ms (5 segundos)
             GestorDesconexiones gestorDesconexiones = new GestorDesconexiones(10000, gestorRed);

@@ -1,5 +1,6 @@
 package org.itson.view;
 
+import org.itson.controller.ControladorJuego;
 import org.itson.model.ModeloJuego;
 import javax.swing.*;
 import java.awt.*;

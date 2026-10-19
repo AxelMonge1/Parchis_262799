@@ -16,6 +16,22 @@ public class ModeloJuego {
     private EstadoJuego estado;
     private long versionEstado;
 
+    public ModeloJuego() {
+        this.dado = new Dado();
+    }
+
+    public ModeloJuego(List<Jugador> jugadores, Tablero tablero, Dado dado, ConfiguracionJuego configuracionJuego, int turnoActual, int contadorSeisSeguidos, int pasosExtraPendientes, EstadoJuego estado, long versionEstado) {
+        this.jugadores = jugadores;
+        this.tablero = tablero;
+        this.dado = dado;
+        this.configuracionJuego = configuracionJuego;
+        this.turnoActual = turnoActual;
+        this.contadorSeisSeguidos = contadorSeisSeguidos;
+        this.pasosExtraPendientes = pasosExtraPendientes;
+        this.estado = estado;
+        this.versionEstado = versionEstado;
+    }
+
     public List<Jugador> getJugadores() {
         return jugadores;
     }

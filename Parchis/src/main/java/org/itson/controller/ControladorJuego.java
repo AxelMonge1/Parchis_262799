@@ -16,6 +16,10 @@ public class ControladorJuego {
     private Set<Integer> jugadoresListos = new HashSet<>();
     private static final int CAPACIDAD_MAXIMA_SALA = 4;
 
+    public ControladorJuego(GestorRed gestorRed) {
+        this.gestorRed = gestorRed;
+    }
+
     // Constructor para inyectar las dependencias
     public ControladorJuego(ModeloJuego modelo, VistaJuego vista, GestorRed gestorRed) {
         this.modelo = modelo;
