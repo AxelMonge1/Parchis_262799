@@ -35,22 +35,22 @@ public class ControladorJuego {
      * Se ejecuta cuando el jugador presiona el botón de lanzar dado en la Vista.
      */
     public void procesarTiradaDado() {
-        // 1. Validar turno local
         int idLocal = gestorRed.getIdJugadorLocal();
-        if (modelo.getTurnoActual() != idLocal) {
-            System.out.println("No es tu turno para lanzar el dado.");
+        int turnoActual = modelo.getTurnoActual();
+
+        // Validar turno
+        if (turnoActual != idLocal) {
+            System.out.println("No es tu turno para lanzar el dado. (Turno en Modelo: " + turnoActual + " | Tu ID Local: " + idLocal + ")");
             return;
         }
 
-        // 2. Ejecutar la tirada en el modelo
+        // Lógica de lanzamiento...
         int resultado = modelo.getDado().lanzar();
         System.out.println("Jugador " + idLocal + " lanzó el dado: " + resultado);
 
-        // 3. Actualizar la vista local y deshabilitar el botón temporalmente
         vista.mostrarResultadoDado(resultado);
         vista.setBotonDadoHabilitado(false);
 
-        // 4. Transmitir el nuevo estado a los demás jugadores
         transmitirCambioEstadoLocal();
     }
 
@@ -122,13 +122,23 @@ public class ControladorJuego {
     }
 
     private void dispararInicioPartidaGlobal() {
+        // 1. Establecer explícitamente el Turno 1 en el modelo del Host
+        if (modelo.getTurnoActual() <= 0) {
+            modelo.setTurnoActual(1);
+        }
+
+        // 2. Notificar a los clientes que la pantalla de lobby finalizó
         PaqueteRed paqueteStart = new PaqueteRed(
                 TipoPaquete.LOBBY_CONFIRM,
                 gestorRed.getIdJugadorLocal(),
                 "INICIAR_JUEGO"
         );
-
         gestorRed.enviarPaqueteATodos(paqueteStart);
+
+        // 3. Transmitir el estado inicial del tablero a todos los clientes
+        transmitirCambioEstadoLocal();
+
+        // 4. Iniciar la interfaz en la computadora del Host
         comenzarPartidaOficial();
     }
 
@@ -158,10 +168,18 @@ public class ControladorJuego {
 
     public void comenzarPartidaOficial() {
         int miId = gestorRed.getIdJugadorLocal();
-        int turnoInicial = 1;
 
+        // Asegurar que el turno inicial sea 1 si el modelo no fue inicializado aún
+        if (modelo.getTurnoActual() <= 0) {
+            modelo.setTurnoActual(1);
+        }
+
+        int turnoInicial = modelo.getTurnoActual();
+
+        // Preparar la vista con el turno real del modelo
         vista.prepararInterfazParaInicio(miId, turnoInicial);
-        System.out.println("¡Partida Iniciada! ID Local: " + miId);
+
+        System.out.println("¡Partida Iniciada! Mi ID: " + miId + " | Turno Actual en Modelo: " + turnoInicial);
     }
 
     /**
