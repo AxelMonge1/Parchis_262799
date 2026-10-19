@@ -15,6 +15,7 @@ public class GestorRed {
     private List<ConexionTCP> conexiones;
     private int idJugadorLocal;
     private ControladorJuego controlador;
+    private ServerSocket serverSocket;
 
     public GestorRed() {
         this.conexiones = new ArrayList<>();
@@ -48,18 +49,41 @@ public class GestorRed {
     }
 
     public void escucharConexiones() {
-        try (ServerSocket serverSocket = new ServerSocket(puertoEscucha)) {
+        try {
+            this.serverSocket = new ServerSocket(puertoEscucha);
             System.out.println("Servidor a la escucha en el puerto " + puertoEscucha);
             while (esHost) {
                 Socket socketCliente = serverSocket.accept();
                 ConexionTCP nuevaConexion = new ConexionTCP(socketCliente);
+
                 synchronized (conexiones) {
                     conexiones.add(nuevaConexion);
                 }
                 procesarPaquetesEntrantes(nuevaConexion);
             }
         } catch (IOException e) {
-            System.err.println("Servidor detenido o error en puerto: " + e.getMessage());
+            if (!esHost) {
+                System.out.println("Servidor detenido intencionalmente.");
+            } else {
+                System.err.println("Error inesperado en ServerSocket: " + e.getMessage());
+            }
+        }
+    }
+
+    public void cerrarServidor() {
+        this.esHost = false;
+        synchronized (conexiones) {
+            for (ConexionTCP conexion : conexiones) {
+                conexion.cerrarConexion();
+            }
+            conexiones.clear();
+        }
+        try {
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                serverSocket.close();
+            }
+        } catch (IOException e) {
+            System.err.println("Error al cerrar ServerSocket: " + e.getMessage());
         }
     }
 

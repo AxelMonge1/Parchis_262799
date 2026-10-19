@@ -4,6 +4,7 @@ import org.itson.conection.GestorRed;
 import org.itson.conection.auxiliar.PaqueteRed;
 import org.itson.conection.auxiliar.TipoPaquete;
 import org.itson.model.ModeloJuego;
+import org.itson.view.VistaJuego;
 
 public class ControladorJuego {
     private ModeloJuego modelo;
@@ -49,7 +50,7 @@ public class ControladorJuego {
         int pasos = modelo.getDado().getValorActual();
 
         // 1. Ejecutamos el movimiento en el modelo
-        boolean movimientoExitoso = modelo.moverFicha(idJugador, idFicha, pasos); //
+        boolean movimientoExitoso = modelo.moverFicha(idFicha, pasos); //
 
         if (movimientoExitoso) {
             // 2. Lógica de finalización de turno (Reglas de repetición)
