@@ -1,4 +1,5 @@
 package org.itson.conection;
+
 import org.itson.conection.auxiliar.PaqueteRed;
 import org.itson.conection.auxiliar.TipoPaquete;
 import org.itson.controller.ControladorJuego;
@@ -22,10 +23,12 @@ public class GestorRed {
     private boolean esHost;
     private int puertoEscucha;
     private int idJugadorLocal;
+    private volatile boolean activo;
 
     public GestorRed() {
         this.esHost = false;
         this.idJugadorLocal = 0;
+        this.activo = true;
     }
 
     /**
@@ -35,6 +38,7 @@ public class GestorRed {
         this.esHost = true;
         this.puertoEscucha = puerto;
         this.idJugadorLocal = 1; // El Host siempre es el Jugador 1
+        this.activo = true;
 
         new Thread(this::escucharConexiones).start();
         iniciarEmisorHeartbeat();
@@ -46,6 +50,7 @@ public class GestorRed {
      */
     public boolean conectarAHost(String ip, int puerto) {
         this.esHost = false;
+        this.activo = true;
         try {
             Socket socket = new Socket(ip, puerto);
             ConexionTCP nuevaConexion = new ConexionTCP(socket);
@@ -72,7 +77,7 @@ public class GestorRed {
             this.serverSocket = new ServerSocket(puertoEscucha);
             System.out.println("Servidor escuchando en el puerto " + puertoEscucha);
 
-            while (esHost) {
+            while (esHost && activo) {
                 Socket socketCliente = serverSocket.accept();
                 ConexionTCP nuevaConexion = new ConexionTCP(socketCliente);
 
@@ -98,7 +103,7 @@ public class GestorRed {
                 }
             }
         } catch (IOException e) {
-            if (!esHost) {
+            if (!esHost || !activo) {
                 System.out.println("Servidor detenido intencionalmente.");
             } else {
                 System.err.println("Error en el servidor TCP: " + e.getMessage());
@@ -112,7 +117,7 @@ public class GestorRed {
     public void procesarPaquetesEntrantes(ConexionTCP conexion) {
         new Thread(() -> {
             try {
-                while (conexion.isEstaActivo()) {
+                while (conexion.isEstaActivo() && activo) {
                     PaqueteRed paquete = conexion.recibirPaquete();
 
                     if (paquete == null) {
@@ -134,45 +139,45 @@ public class GestorRed {
                         continue;
                     }
 
+                    String mensaje = paquete.getMensaje();
+
                     // 3. Registro de ID asignado al cliente
                     if (paquete.getTipo() == TipoPaquete.LOBBY_CONFIRM
-                            && paquete.getMensaje().startsWith("ASIGNAR_ID:")) {
-                        int miId = Integer.parseInt(paquete.getMensaje().split(":")[1]);
+                            && mensaje != null && mensaje.startsWith("ASIGNAR_ID:")) {
+                        int miId = Integer.parseInt(mensaje.split(":")[1]);
                         this.idJugadorLocal = miId;
                         System.out.println("ID asignado por el Host: Jugador " + miId);
                     }
 
                     // 4. Delegación de reglas y acciones al ControladorJuego
-                    if (controlador != null) {
+                    if (controlador != null && mensaje != null) {
                         try {
                             switch (paquete.getTipo()) {
                                 case ACCION:
-                                    if ("TIRAR_DADO".equalsIgnoreCase(paquete.getMensaje())) {
+                                    if ("TIRAR_DADO".equalsIgnoreCase(mensaje)) {
                                         controlador.procesarTiradaDado();
-                                    } else if (paquete.getMensaje().startsWith("MOVER_FICHA:")) {
-                                        int idFicha = Integer.parseInt(paquete.getMensaje().split(":")[1]);
+                                    } else if (mensaje.startsWith("MOVER_FICHA:")) {
+                                        int idFicha = Integer.parseInt(mensaje.split(":")[1]);
                                         controlador.procesarAccionJugador(paquete.getIdEmisor(), idFicha);
                                     }
                                     break;
 
                                 case SYNC_ESTADO:
-                                    if (paquete.getMensaje() != null && !"null".equalsIgnoreCase(paquete.getMensaje())) {
-                                        // 📍 Aquí se consume el método de actualización remota
-                                        controlador.aplicarSincronizacionRemota(paquete.getMensaje());
+                                    if (!"null".equalsIgnoreCase(mensaje) && !mensaje.trim().isEmpty()) {
+                                        controlador.aplicarSincronizacionRemota(mensaje);
                                     }
                                     break;
 
                                 case LOBBY_CONFIRM:
-                                    String msg = paquete.getMensaje();
-                                    if (msg.startsWith("JUGADOR_LISTO:")) {
-                                        int idListo = Integer.parseInt(msg.split(":")[1]);
+                                    if (mensaje.startsWith("JUGADOR_LISTO:")) {
+                                        int idListo = Integer.parseInt(mensaje.split(":")[1]);
                                         if (esHost) {
                                             controlador.procesarJugadorListo(idListo);
                                             enviarPaqueteATodos(paquete);
                                         } else {
                                             controlador.procesarJugadorListo(idListo);
                                         }
-                                    } else if ("INICIAR_JUEGO".equalsIgnoreCase(msg)) {
+                                    } else if ("INICIAR_JUEGO".equalsIgnoreCase(mensaje)) {
                                         controlador.comenzarPartidaOficial();
                                     }
                                     break;
@@ -221,9 +226,11 @@ public class GestorRed {
      */
     public void iniciarEmisorHeartbeat() {
         new Thread(() -> {
-            while (true) {
+            while (activo) {
                 try {
                     Thread.sleep(2000);
+                    if (!activo) break;
+
                     PaqueteRed ping = new PaqueteRed(
                             TipoPaquete.HEARTBEAT,
                             idJugadorLocal,
@@ -231,6 +238,7 @@ public class GestorRed {
                     );
                     enviarPaqueteATodos(ping);
                 } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                     break;
                 }
             }
@@ -241,6 +249,7 @@ public class GestorRed {
      * Apaga el servidor y cierra todas las conexiones.
      */
     public void cerrarServidor() {
+        this.activo = false;
         this.esHost = false;
         synchronized (conexiones) {
             for (ConexionTCP conexion : conexiones) {
