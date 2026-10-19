@@ -59,20 +59,33 @@ public class GestorRed {
         try {
             this.serverSocket = new ServerSocket(puertoEscucha);
             System.out.println("Servidor a la escucha en el puerto " + puertoEscucha);
+
             while (esHost) {
+                // 1. Espera a que se conecte un cliente (bloqueante)
                 Socket socketCliente = serverSocket.accept();
                 ConexionTCP nuevaConexion = new ConexionTCP(socketCliente);
 
                 synchronized (conexiones) {
                     conexiones.add(nuevaConexion);
+
+                    // 📍 CÓDIGO AQUÍ: Asigna el ID del jugador según el orden de llegada
+                    // El Host es el 1, los clientes serán 2, 3 o 4
+                    nuevaConexion.setIdJugadorAsociado(conexiones.size() + 1);
                 }
+
+                // 2. Inicia la escucha de paquetes para este nuevo cliente
                 procesarPaquetesEntrantes(nuevaConexion);
+
+                // 📍 CÓDIGO AQUÍ: Notifica al controlador para revisar si se alcanzaron 4 jugadores
+                if (controlador != null) {
+                    controlador.notificarNuevoJugadorConectado();
+                }
             }
         } catch (IOException e) {
             if (!esHost) {
                 System.out.println("Servidor detenido intencionalmente.");
             } else {
-                System.err.println("Error inesperado en ServerSocket: " + e.getMessage());
+                System.err.println("Error en el servidor TCP: " + e.getMessage());
             }
         }
     }
