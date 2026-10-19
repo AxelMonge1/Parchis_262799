@@ -5,6 +5,7 @@ import java.util.Map;
 
 public class ModeloJuego {
     private int turnoActual = 1;
+    private int totalJugadores = 4; // Se ajusta dinámicamente según la red
     private boolean dadoLanzado = false;
     private int numSalida = 5; // Número requerido para salir de casa (Configurable)
     private int pasosExtraPendientes = 0;
@@ -108,10 +109,15 @@ public class ModeloJuego {
         return true;
     }
 
+    /**
+     * Rotación dinámica del turno considerando solo los jugadores activos/conectados.
+     */
     public void cambiarTurno() {
         this.dadoLanzado = false;
         this.pasosExtraPendientes = 0;
-        this.turnoActual = (this.turnoActual % 4) + 1;
+        int limiteJugadores = Math.max(1, totalJugadores);
+        this.turnoActual = (this.turnoActual % limiteJugadores) + 1;
+        System.out.println("Turno cambiado -> Ahora es turno del Jugador " + this.turnoActual + " (Total jugadores: " + limiteJugadores + ")");
     }
 
     // --- SERIALIZACIÓN DE ESTADO PARA LA RED ---
@@ -121,7 +127,8 @@ public class ModeloJuego {
         sb.append(turnoActual).append(";")
                 .append(dado.getValorActual()).append(";")
                 .append(dadoLanzado).append(";")
-                .append(numSalida).append("#");
+                .append(numSalida).append(";")
+                .append(totalJugadores).append("#");
 
         posicionesFichas.forEach((jugadorId, fichas) -> {
             sb.append(jugadorId).append(":");
@@ -149,6 +156,9 @@ public class ModeloJuego {
 
                     if (cabecera.length >= 4) {
                         this.numSalida = Integer.parseInt(cabecera[3]);
+                    }
+                    if (cabecera.length >= 5) {
+                        this.totalJugadores = Integer.parseInt(cabecera[4]);
                     }
                 }
             }
@@ -196,6 +206,8 @@ public class ModeloJuego {
     // --- GETTERS Y SETTERS ---
     public int getTurnoActual() { return turnoActual; }
     public void setTurnoActual(int turnoActual) { this.turnoActual = turnoActual; }
+    public int getTotalJugadores() { return totalJugadores; }
+    public void setTotalJugadores(int totalJugadores) { this.totalJugadores = totalJugadores; }
     public boolean isDadoLanzado() { return dadoLanzado; }
     public void setDadoLanzado(boolean dadoLanzado) { this.dadoLanzado = dadoLanzado; }
     public int getNumSalida() { return numSalida; }

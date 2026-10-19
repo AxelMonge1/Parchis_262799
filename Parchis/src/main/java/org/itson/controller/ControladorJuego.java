@@ -53,7 +53,7 @@ public class ControladorJuego {
         System.out.println("Jugador " + idLocal + " lanzó el dado: " + resultado);
         vista.mostrarResultadoDado(resultado);
 
-        // 4. Verificar si tiene movimientos válidos (ej. si requiere 5 y sacó 3 estando en casa)
+        // 4. Verificar si tiene movimientos válidos
         if (!modelo.tieneMovimientosValidos(idLocal)) {
             vista.mostrarMensaje("Sin movimientos válidos con un " + resultado + ". Pasa el turno.");
 
@@ -213,6 +213,9 @@ public class ControladorJuego {
     }
 
     private void dispararInicioPartidaGlobal() {
+        int conectados = getTotalJugadoresConectados();
+        modelo.setTotalJugadores(conectados);
+
         if (modelo.getTurnoActual() <= 0) {
             modelo.setTurnoActual(1);
         }
@@ -230,6 +233,8 @@ public class ControladorJuego {
 
     public void comenzarPartidaOficial() {
         int miId = gestorRed.getIdJugadorLocal();
+        int conectados = getTotalJugadoresConectados();
+        modelo.setTotalJugadores(conectados);
 
         if (modelo.getTurnoActual() <= 0) {
             modelo.setTurnoActual(1);
@@ -238,7 +243,7 @@ public class ControladorJuego {
         int turnoInicial = modelo.getTurnoActual();
         vista.prepararInterfazParaInicio(miId, turnoInicial);
 
-        System.out.println("¡Partida Iniciada! Mi ID: " + miId + " | Turno Inicial: " + turnoInicial);
+        System.out.println("¡Partida Iniciada! Mi ID: " + miId + " | Jugadores en Sala: " + conectados + " | Turno Inicial: " + turnoInicial);
     }
 
     // --- GETTERS Y SETTERS ---
