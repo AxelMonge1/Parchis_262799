@@ -269,6 +269,27 @@ public class VistaJuego extends JFrame {
         }
     }
 
+    public void mostrarEstadoEsperandoJugadores() {
+        SwingUtilities.invokeLater(() -> {
+            btnAccionLobby.setEnabled(false);
+            btnAccionLobby.setText("Esperando a los demás...");
+        });
+    }
+
+    public void prepararInterfazParaInicio(int miId, int turnoActual) {
+        SwingUtilities.invokeLater(() -> {
+            btnAccionLobby.setText("En Partida");
+            btnAccionLobby.setEnabled(false);
+
+            mostrarTurnoActual(turnoActual);
+
+            boolean esMiTurno = (miId == turnoActual);
+            btnDado.setEnabled(esMiTurno);
+
+            renderizarTablero();
+        });
+    }
+
     public void mostrarMensaje(String mensaje) { //[cite: 4]
         JOptionPane.showMessageDialog(this, mensaje, "Notificación", JOptionPane.INFORMATION_MESSAGE);
     }

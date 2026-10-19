@@ -29,104 +29,6 @@ public class ControladorJuego {
         return gestorRed.getConexiones().size() + 1;
     }
 
-    public void presionarBotonListo() {
-        int miId = gestorRed.getIdJugadorLocal();
-
-        vista.getBtnAccionLobby().setEnabled(false);
-        vista.getBtnAccionLobby().setText("Esperando a los demás...");
-
-        PaqueteRed paqueteListo = new PaqueteRed(
-                TipoPaquete.LOBBY_CONFIRM,
-                miId,
-                "JUGADOR_LISTO:" + miId
-        );
-
-        if (gestorRed.isEsHost()) {
-            procesarJugadorListo(miId);
-            gestorRed.enviarPaqueteATodos(paqueteListo);
-        } else {
-            if (!gestorRed.getConexiones().isEmpty()) {
-                gestorRed.getConexiones().get(0).enviarPaquete(paqueteListo);
-            }
-        }
-    }
-
-    /**
-     * Evalúa si se cumplen las condiciones para iniciar la partida.
-     */
-    public synchronized void procesarJugadorListo(int idJugador) {
-        jugadoresListos.add(idJugador);
-
-        int conectados = getTotalJugadoresConectados();
-        vista.mostrarMensaje("Jugador " + idJugador + " listo (" + jugadoresListos.size() + "/" + conectados + ")");
-
-        // Evaluación de inicio en el Host
-        if (gestorRed.isEsHost()) {
-            verificarInicioPartida();
-        }
-    }
-
-    /**
-     * Notificación cuando un nuevo cliente se conecta a la sala.
-     */
-    public synchronized void notificarNuevoJugadorConectado() {
-        if (!gestorRed.isEsHost()) return;
-
-        int conectados = getTotalJugadoresConectados();
-        vista.mostrarMensaje("¡Nuevo jugador unido! Conectados: " + conectados + "/" + CAPACIDAD_MAXIMA_SALA);
-
-        // Si la sala se llena (4 jugadores), inicia automáticamente
-        if (conectados >= CAPACIDAD_MAXIMA_SALA) {
-            vista.mostrarMensaje("¡Sala llena (4/4)! Iniciando automáticamente...");
-            dispararInicioPartidaGlobal();
-        }
-    }
-
-    /**
-     * Revisa si todos los conectados le dieron a listo (Mínimo 2 jugadores).
-     */
-    private void verificarInicioPartida() {
-        int conectados = getTotalJugadoresConectados();
-
-        // Se requiere mínimo 2 personas y que TODOS los conectados estén listos
-        boolean todosListos = (conectados >= 2) && (jugadoresListos.size() == conectados);
-
-        if (todosListos) {
-            dispararInicioPartidaGlobal();
-        }
-    }
-
-    /**
-     * Transmite el paquete de inicio a toda la red y arranca localmente.
-     */
-    private void dispararInicioPartidaGlobal() {
-        PaqueteRed paqueteStart = new PaqueteRed(
-                TipoPaquete.LOBBY_CONFIRM,
-                gestorRed.getIdJugadorLocal(),
-                "INICIAR_JUEGO"
-        );
-
-        gestorRed.enviarPaqueteATodos(paqueteStart);
-        comenzarPartidaOficial();
-    }
-
-    /**
-     * Activa la interfaz de juego real.
-     */
-    public void comenzarPartidaOficial() {
-        vista.getBtnAccionLobby().setText("En Partida");
-        vista.getBtnAccionLobby().setEnabled(false);
-
-        int turnoActual = 1; // Comienza el Jugador 1
-        vista.mostrarTurnoActual(turnoActual);
-
-        // Se habilita el dado únicamente si es el turno del jugador local
-        boolean esMiTurno = (gestorRed.getIdJugadorLocal() == turnoActual);
-        vista.getBtnDado().setEnabled(esMiTurno);
-
-        vista.mostrarMensaje("¡Comienza la partida!");
-    }
-
     /**
      * Inicia el ciclo principal del juego.
      */
@@ -148,6 +50,78 @@ public class ControladorJuego {
 
         // Actualizamos la interfaz y notificamos a la red
         notificarCambioEstado();
+    }
+
+    public synchronized void procesarJugadorListo(int idJugador) {
+        jugadoresListos.add(idJugador);
+        int conectados = getTotalJugadoresConectados();
+
+        System.out.println("Jugador " + idJugador + " listo (" + jugadoresListos.size() + "/" + conectados + ")");
+
+        if (gestorRed.isEsHost()) {
+            verificarInicioPartida();
+        }
+    }
+
+    public synchronized void notificarNuevoJugadorConectado() {
+        if (!gestorRed.isEsHost()) return;
+
+        int conectados = getTotalJugadoresConectados();
+        System.out.println("Nuevo jugador unido. Total: " + conectados);
+
+        if (conectados >= CAPACIDAD_MAXIMA_SALA) {
+            dispararInicioPartidaGlobal();
+        }
+    }
+
+    private void verificarInicioPartida() {
+        int conectados = getTotalJugadoresConectados();
+        if (conectados >= 2 && jugadoresListos.size() >= conectados) {
+            dispararInicioPartidaGlobal();
+        }
+    }
+
+    private void dispararInicioPartidaGlobal() {
+        PaqueteRed paqueteStart = new PaqueteRed(
+                TipoPaquete.LOBBY_CONFIRM,
+                gestorRed.getIdJugadorLocal(),
+                "INICIAR_JUEGO"
+        );
+
+        gestorRed.enviarPaqueteATodos(paqueteStart);
+        comenzarPartidaOficial();
+    }
+
+    public void presionarBotonListo() {
+        int miId = gestorRed.getIdJugadorLocal();
+
+        // Antes se usaba SwingUtilities.invokeLater aquí; ahora se delega a la vista
+        vista.mostrarEstadoEsperandoJugadores();
+
+        PaqueteRed paqueteListo = new PaqueteRed(
+                TipoPaquete.LOBBY_CONFIRM,
+                miId,
+                "JUGADOR_LISTO:" + miId
+        );
+
+        if (gestorRed.isEsHost()) {
+            procesarJugadorListo(miId);
+            gestorRed.enviarPaqueteATodos(paqueteListo);
+        } else {
+            if (!gestorRed.getConexiones().isEmpty()) {
+                gestorRed.getConexiones().get(0).enviarPaquete(paqueteListo);
+            }
+        }
+    }
+
+    public void comenzarPartidaOficial() {
+        int miId = gestorRed.getIdJugadorLocal();
+        int turnoInicial = 1;
+
+        // Antes se manipulaban btnDado y btnAccionLobby directamente aquí; ahora solo se ordena a la vista
+        vista.prepararInterfazParaInicio(miId, turnoInicial);
+
+        System.out.println("¡Partida Iniciada! ID Local: " + miId);
     }
 
     /**

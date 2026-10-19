@@ -61,22 +61,26 @@ public class GestorRed {
             System.out.println("Servidor a la escucha en el puerto " + puertoEscucha);
 
             while (esHost) {
-                // 1. Espera a que se conecte un cliente (bloqueante)
                 Socket socketCliente = serverSocket.accept();
                 ConexionTCP nuevaConexion = new ConexionTCP(socketCliente);
 
+                int idAsignado;
                 synchronized (conexiones) {
                     conexiones.add(nuevaConexion);
-
-                    // 📍 CÓDIGO AQUÍ: Asigna el ID del jugador según el orden de llegada
-                    // El Host es el 1, los clientes serán 2, 3 o 4
-                    nuevaConexion.setIdJugadorAsociado(conexiones.size() + 1);
+                    idAsignado = conexiones.size() + 1; // Host es 1, Clientes son 2, 3, 4
+                    nuevaConexion.setIdJugadorAsociado(idAsignado);
                 }
 
-                // 2. Inicia la escucha de paquetes para este nuevo cliente
                 procesarPaquetesEntrantes(nuevaConexion);
 
-                // 📍 CÓDIGO AQUÍ: Notifica al controlador para revisar si se alcanzaron 4 jugadores
+                // 📍 NUEVO: Le enviamos un paquete al Cliente indicándole su ID de jugador
+                PaqueteRed paqueteId = new PaqueteRed(
+                        TipoPaquete.LOBBY_CONFIRM,
+                        1,
+                        "ASIGNAR_ID:" + idAsignado
+                );
+                nuevaConexion.enviarPaquete(paqueteId);
+
                 if (controlador != null) {
                     controlador.notificarNuevoJugadorConectado();
                 }
@@ -141,7 +145,25 @@ public class GestorRed {
                                     break;
 
                                 case LOBBY_CONFIRM:
-                                    System.out.println("Lobby confirmado: " + paquete.getMensaje());
+                                    String msg = paquete.getMensaje();
+
+                                    if (msg.startsWith("ASIGNAR_ID:")) {
+                                        int miId = Integer.parseInt(msg.split(":")[1]);
+                                        setIdJugadorLocal(miId); // El cliente guarda su ID oficial (ej. 2)
+                                        System.out.println("ID asignado por el Host: Jugador " + miId);
+                                    }
+                                    else if (msg.startsWith("JUGADOR_LISTO:")) {
+                                        int idListo = Integer.parseInt(msg.split(":")[1]);
+                                        if (esHost) {
+                                            controlador.procesarJugadorListo(idListo);
+                                            enviarPaqueteATodos(paquete);
+                                        } else {
+                                            controlador.procesarJugadorListo(idListo);
+                                        }
+                                    }
+                                    else if ("INICIAR_JUEGO".equalsIgnoreCase(msg)) {
+                                        controlador.comenzarPartidaOficial();
+                                    }
                                     break;
                             }
                         } catch (Exception ex) {
