@@ -45,15 +45,12 @@ public class ControladorJuego {
      * Se ejecuta cuando el jugador presiona el botón de lanzar dado en la Vista.
      */
     public void procesarTiradaDado() {
-        // 1. El controlador pide al modelo lanzar el dado
-        int valorDado = modelo.lanzarDado(); //
+        // 1. Ejecutar la lógica local de la tirada
+        int resultado = modelo.getDado().lanzar();
+        vista.mostrarResultadoDado(resultado);
 
-        // Según el diagrama de secuencia, aquí el modelo evalúa los 3 seises seguidos
-        // y determina qué fichas son movibles. Si la lista de fichas movibles
-        // está vacía, se pasa al siguiente turno automáticamente.
-
-        // Actualizamos la interfaz y notificamos a la red
-        notificarCambioEstado();
+        // 2. 📍 Transmitir el nuevo estado a los demás jugadores
+        transmitirCambioEstadoLocal();
     }
 
     public synchronized void procesarJugadorListo(int idJugador) {
@@ -84,18 +81,21 @@ public class ControladorJuego {
     public void transmitirCambioEstadoLocal() {
         String estadoSerializado = modelo.obtenerEstadoSerializado();
 
-        if (estadoSerializado != null) {
-            PaqueteRed paquete = new PaqueteRed(
-                    TipoPaquete.SYNC_ESTADO,
-                    gestorRed.getIdJugadorLocal(),
-                    estadoSerializado
-            );
+        // 📍 Filtro de seguridad: No transmitir nada si la partida no ha comenzado o el estado es nulo
+        if (estadoSerializado == null || estadoSerializado.trim().isEmpty() || "null".equalsIgnoreCase(estadoSerializado)) {
+            return;
+        }
 
-            if (gestorRed.isEsHost()) {
-                gestorRed.enviarPaqueteATodos(paquete);
-            } else if (!gestorRed.getConexiones().isEmpty()) {
-                gestorRed.getConexiones().get(0).enviarPaquete(paquete);
-            }
+        PaqueteRed paquete = new PaqueteRed(
+                TipoPaquete.SYNC_ESTADO,
+                gestorRed.getIdJugadorLocal(),
+                estadoSerializado
+        );
+
+        if (gestorRed.isEsHost()) {
+            gestorRed.enviarPaqueteATodos(paquete);
+        } else if (!gestorRed.getConexiones().isEmpty()) {
+            gestorRed.getConexiones().get(0).enviarPaquete(paquete);
         }
     }
 
@@ -128,21 +128,26 @@ public class ControladorJuego {
     public void presionarBotonListo() {
         int miId = gestorRed.getIdJugadorLocal();
 
-        // Antes se usaba SwingUtilities.invokeLater aquí; ahora se delega a la vista
-        vista.mostrarEstadoEsperandoJugadores();
+        // Evitar enviar el paquete si el cliente aún no ha recibido su ID del Host
+        if (miId == 0) {
+            System.err.println("Aún no se ha asignado un ID de jugador para esta conexión.");
+            return;
+        }
 
-        PaqueteRed paqueteListo = new PaqueteRed(
+        // 1. Armar paquete de lobby
+        PaqueteRed paquete = new PaqueteRed(
                 TipoPaquete.LOBBY_CONFIRM,
                 miId,
                 "JUGADOR_LISTO:" + miId
         );
 
+        // 2. Transmitir según el rol
         if (gestorRed.isEsHost()) {
             procesarJugadorListo(miId);
-            gestorRed.enviarPaqueteATodos(paqueteListo);
+            gestorRed.enviarPaqueteATodos(paquete);
         } else {
             if (!gestorRed.getConexiones().isEmpty()) {
-                gestorRed.getConexiones().get(0).enviarPaquete(paqueteListo);
+                gestorRed.getConexiones().get(0).enviarPaquete(paquete);
             }
         }
     }
@@ -161,27 +166,48 @@ public class ControladorJuego {
      * Se ejecuta cuando el jugador selecciona una de sus fichas en la Vista.
      */
     public void procesarAccionJugador(int idJugador, int idFicha) {
-        // Obtenemos el valor actual del dado para el movimiento
-        // (Asumiendo acceso a través del modelo según la agregación Modelo->Dado)[cite: 4]
-        int pasos = modelo.getDado().getValorActual();
-
-        // 1. Ejecutamos el movimiento en el modelo
-        boolean movimientoExitoso = modelo.moverFicha(idFicha, pasos); //
-
-        if (movimientoExitoso) {
-            // 2. Lógica de finalización de turno (Reglas de repetición)
-            // Según el bloque "alt" del diagrama de secuencia:
-            if (modelo.getPasosExtraPendientes() > 0 || pasos == 6) {
-                // El jugador repite turno o debe gastar sus pasos extra[cite: 5]
-                // modelo.prepararSiguienteAccion();
-            } else {
-                // Si no sacó 6 y no tiene recompensas, el turno cambia al siguiente jugador[cite: 5]
-                modelo.cambiarTurno(); //
-            }
+        // 1. Validar que la acción corresponda al jugador en turno
+        if (idJugador != modelo.getTurnoActual()) {
+            System.out.println("Intento de movimiento fuera de turno por parte del Jugador " + idJugador);
+            return;
         }
 
-        // 3. Notificar los cambios a todos los clientes
-        notificarCambioEstado(); //[cite: 4]
+        // 2. Obtener el valor actual del dado
+        int pasos = modelo.getDado().getValorActual();
+
+        // 3. Ejecutar el movimiento en el modelo
+        boolean movimientoExitoso = modelo.moverFicha(idFicha, pasos);
+
+        if (movimientoExitoso) {
+            // 4. Aplicar reglas de repetición de turno o cambio de turno
+            if (modelo.getPasosExtraPendientes() > 0) {
+                // Hay pasos extra pendientes (ej: +20 por comer, +10 por llegada).
+                // Se conserva el turno del jugador actual para que use su bonificación.
+                System.out.println("Jugador " + idJugador + " conserva turno por pasos extra pendientes.");
+            } else if (pasos == 6) {
+                // Sacar un 6 otorga repetición de tiro
+                System.out.println("Jugador " + idJugador + " repite turno por haber sacado 6.");
+            } else {
+                // Si no hay recompensas ni sacó 6, pasa el turno al siguiente jugador
+                modelo.cambiarTurno();
+            }
+        } else {
+            System.out.println("El movimiento de la ficha " + idFicha + " no es válido.");
+            return;
+        }
+
+        // 5. Actualizar la interfaz gráfica (Vista)
+        vista.renderizarTablero();
+
+        int turnoActual = modelo.getTurnoActual();
+        int miIdLocal = gestorRed.getIdJugadorLocal();
+
+        // Habilitar el botón de lanzar dado solo si es el turno de esta computadora
+        vista.mostrarTurnoActual(turnoActual);
+        vista.setBotonDadoHabilitado(miIdLocal == turnoActual);
+
+        // 6. Transmitir el estado actualizado a los demás jugadores por la red
+        transmitirCambioEstadoLocal();
     }
 
     /**

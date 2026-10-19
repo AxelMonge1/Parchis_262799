@@ -156,8 +156,8 @@ public class GestorRed {
                                     break;
 
                                 case SYNC_ESTADO:
-                                    // Evitar procesar paquetes vacíos/nulos
                                     if (paquete.getMensaje() != null && !"null".equalsIgnoreCase(paquete.getMensaje())) {
+                                        // 📍 Aquí se consume el método de actualización remota
                                         controlador.aplicarSincronizacionRemota(paquete.getMensaje());
                                     }
                                     break;

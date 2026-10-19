@@ -375,6 +375,12 @@ public class VistaJuego extends JFrame {
         btn.setFocusPainted(false);
     }
 
+    public void setBotonDadoHabilitado(boolean habilitado) {
+        SwingUtilities.invokeLater(() -> {
+            btnDado.setEnabled(habilitado);
+        });
+    }
+
     public JButton getBtnCrearPartidaMenu() { return btnCrearPartidaMenu; }
 
     public JButton getBtnUnirsePartidaMenu() { return btnUnirsePartidaMenu; }
