@@ -7,6 +7,10 @@ public class Dado {
         return valorActual;
     }
 
+    public void setValorActual(int valorActual) {
+        this.valorActual = valorActual;
+    }
+
     public int lanzar(){
          int num = (int) (Math.random() * 6) + 1;
          this.valorActual = num;

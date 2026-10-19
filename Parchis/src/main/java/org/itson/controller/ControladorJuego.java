@@ -74,6 +74,35 @@ public class ControladorJuego {
         }
     }
 
+    /**
+     * Emite el estado local hacia los demás jugadores.
+     */
+    public void transmitirCambioEstadoLocal() {
+        String estadoSerializado = modelo.obtenerEstadoSerializado();
+
+        if (estadoSerializado != null) {
+            PaqueteRed paquete = new PaqueteRed(
+                    TipoPaquete.SYNC_ESTADO,
+                    gestorRed.getIdJugadorLocal(),
+                    estadoSerializado
+            );
+
+            if (gestorRed.isEsHost()) {
+                gestorRed.enviarPaqueteATodos(paquete);
+            } else if (!gestorRed.getConexiones().isEmpty()) {
+                gestorRed.getConexiones().get(0).enviarPaquete(paquete);
+            }
+        }
+    }
+
+    /**
+     * Recibe la sincronización remota y actualiza vista y modelo sin retransmitir.
+     */
+    public void aplicarSincronizacionRemota(String datosEstado) {
+        modelo.actualizarDesdeRed(datosEstado);
+        vista.renderizarTablero();
+    }
+
     private void verificarInicioPartida() {
         int conectados = getTotalJugadoresConectados();
         if (conectados >= 2 && jugadoresListos.size() >= conectados) {

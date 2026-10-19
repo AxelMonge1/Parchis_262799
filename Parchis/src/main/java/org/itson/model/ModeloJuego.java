@@ -165,4 +165,36 @@ public class ModeloJuego {
         }
         return false;
     }
+
+    /**
+     * Convierte el estado actual del juego a una cadena de texto para enviarla por red.
+     */
+    public String obtenerEstadoSerializado() {
+        // Ejemplo de formato: "TURNO;ULTIMO_DADO"
+        // Adapta los atributos a los nombres reales de tu ModeloJuego
+        return this.turnoActual + ";" + this.dado.getValorActual();
+    }
+
+    /**
+     * Recibe la cadena serializada desde la red y actualiza el estado local del modelo.
+     */
+    public void actualizarDesdeRed(String datosEstado) {
+        if (datosEstado == null || datosEstado.trim().isEmpty() || "null".equalsIgnoreCase(datosEstado)) {
+            return;
+        }
+
+        try {
+            String[] partes = datosEstado.split(";");
+
+            if (partes.length >= 2) {
+                this.turnoActual = Integer.parseInt(partes[0]);
+                this.dado.setValorActual(Integer.parseInt(partes[1]));
+            }
+
+            // Si tu modelo maneja posiciones de fichas en la cadena, se parsean aquí
+
+        } catch (Exception e) {
+            System.err.println("Error deserializando el estado en ModeloJuego: " + e.getMessage());
+        }
+    }
 }
