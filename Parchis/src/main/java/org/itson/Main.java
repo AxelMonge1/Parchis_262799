@@ -3,12 +3,14 @@ package org.itson;
 import org.itson.conection.GestorRed;
 import org.itson.conection.auxiliar.GestorDesconexiones;
 import org.itson.controller.ControladorJuego;
-import org.itson.view.VistaJuego;
 import org.itson.model.ModeloJuego;
+import org.itson.view.VistaJuego;
+
 import javax.swing.*;
 
 public class Main {
-    static void main() {
+
+    public static void main(String[] args) {
         // Ejecutar la interfaz gráfica en el Event Dispatch Thread (EDT) de Swing
         SwingUtilities.invokeLater(() -> {
 
@@ -16,22 +18,20 @@ public class Main {
             ModeloJuego modelo = new ModeloJuego();
             VistaJuego vista = new VistaJuego();
             GestorRed gestorRed = new GestorRed();
-            ControladorJuego controladorJuego = new ControladorJuego(modelo, vista, gestorRed);
 
-            gestorRed.setControlador(controladorJuego);
-
-            // Gestor de desconexiones configurado con un timeout de 5000ms (5 segundos)
-            GestorDesconexiones gestorDesconexiones = new GestorDesconexiones(10000, gestorRed);
-
-            // 2. Instanciar el Controlador uniendo las dependencias
+            // 2. Instanciar el Controlador unificado (Instancia ÚNICA)
             ControladorJuego controlador = new ControladorJuego(modelo, vista, gestorRed);
 
-            // 3. Vincular las referencias cruzadas necesarias
+            // 3. Vincular dependencias bidireccionales
             gestorRed.setControlador(controlador);
             vista.setModelo(modelo);
 
-            // 4. Configurar los Listeners de la interfaz gráfica (Navegación del Storyboard)
+            // Configurar gestor de desconexiones
+            GestorDesconexiones gestorDesconexiones = new GestorDesconexiones(10000, gestorRed);
+
+            // 4. Configurar eventos de la interfaz
             configurarEventosUI(vista, controlador, gestorRed, gestorDesconexiones);
+
             vista.addWindowListener(new java.awt.event.WindowAdapter() {
                 @Override
                 public void windowClosing(java.awt.event.WindowEvent windowEvent) {
@@ -46,7 +46,6 @@ public class Main {
         });
     }
 
-    //Conectar la interfaz con la conexión
     private static void configurarEventosUI(VistaJuego vista,
                                             ControladorJuego controlador,
                                             GestorRed gestorRed,
@@ -64,14 +63,12 @@ public class Main {
             boolean servidorIniciado = gestorRed.iniciarServidor(8080);
 
             if (servidorIniciado) {
-                // Iniciar el hilo de monitoreo de caídas de red
                 gestorDesconexiones.monitorearHeartbeat();
-                gestorDesconexiones.agregarPrioridad(1); // El host tiene prioridad 1
+                gestorDesconexiones.agregarPrioridad(1); // Host tiene prioridad 1
 
-                // Cambiar la pantalla al tablero e iniciar partida
+                // Cambiar a la pantalla de lobby
                 vista.mostrarPantalla(VistaJuego.PANTALLA_JUEGO);
-                controlador.iniciarJuego();
-                vista.mostrarMensaje("Partida creada como Host. Esperando jugadores...");
+                vista.mostrarMensaje("Partida creada como Host. Esperando a los demás jugadores...");
             } else {
                 vista.mostrarMensaje("Error al abrir el puerto de red.");
             }
@@ -87,12 +84,12 @@ public class Main {
                 return;
             }
 
-            // Intentar conectar vía socket al Host
+            // Intentar conectar al Host
             boolean conectado = gestorRed.conectarAHost(ip, 8080);
 
             if (conectado) {
                 vista.mostrarPantalla(VistaJuego.PANTALLA_JUEGO);
-                vista.mostrarMensaje("Conectado exitosamente con el Host (" + ip + ")");
+                vista.mostrarMensaje("Conectado exitosamente con el Host (" + ip + "). Presiona 'Listo'.");
             } else {
                 vista.mostrarMensaje("No se pudo establecer conexión con " + ip);
             }
@@ -105,9 +102,8 @@ public class Main {
 
         // --- BOTÓN: Listo / Comenzar en el Lobby ---
         vista.getBtnAccionLobby().addActionListener(e -> {
-            vista.mostrarMensaje("¡Sincronizando estado con todos los jugadores!");
-            controlador.notificarCambioEstado();
+            // 📍 Llama directamente a la lógica de confirmación de lobby en el controlador
+            controlador.presionarBotonListo();
         });
-
     }
 }
