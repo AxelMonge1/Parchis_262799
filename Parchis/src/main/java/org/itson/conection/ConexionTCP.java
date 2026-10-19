@@ -47,12 +47,21 @@ public class ConexionTCP {
     }
 
     public PaqueteRed deserializar(String dato) {
-        String[] partes = dato.split(";");
-        return new PaqueteRed(
-                TipoPaquete.valueOf(partes[0]),
-                Integer.parseInt(partes[1]),
-                partes[2]
-        );
+        try {
+            if (dato == null || dato.trim().isEmpty()) return null;
+
+            String[] partes = dato.split(";");
+            if (partes.length < 3) return null;
+
+            return new PaqueteRed(
+                    TipoPaquete.valueOf(partes[0]),
+                    Integer.parseInt(partes[1]),
+                    partes[2]
+            );
+        } catch (Exception e) {
+            System.err.println("Error deserializando paquete recibido (" + dato + "): " + e.getMessage());
+            return null;
+        }
     }
 
     public void cerrarConexion() {
@@ -109,5 +118,9 @@ public class ConexionTCP {
 
     public void actualizarHeartbeat() {
         this.ultimoHeartbeat = System.currentTimeMillis();
+    }
+
+    public void setUltimoHeartbeat(long ultimoHeartbeat) {
+        this.ultimoHeartbeat = ultimoHeartbeat;
     }
 }

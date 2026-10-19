@@ -49,6 +49,11 @@ public class GestorRed {
             return false;
         }
     }
+    public void removerConexion(ConexionTCP conexion) {
+        synchronized (conexiones) {
+            conexiones.remove(conexion);
+        }
+    }
 
     public void escucharConexiones() {
         try {
@@ -94,35 +99,49 @@ public class GestorRed {
             try {
                 while (conexion.isEstaActivo()) {
                     PaqueteRed paquete = conexion.recibirPaquete();
+
                     if (paquete == null) {
-                        break;
+                        break; // Cliente desconectado o socket cerrado
                     }
-                    conexion.actualizarHeartbeat();
+
+                    // 1. Cualquier paquete válido recibido reinicia el temporizador de vida
+                    conexion.setUltimoHeartbeat(System.currentTimeMillis());
+
+                    // 2. Procesamiento aislado de acciones (un error aquí NO cierra la conexión)
                     if (controlador != null) {
-                        switch (paquete.getTipo()) {
-                            case ACCION:
-                                if ("TIRAR_DADO".equalsIgnoreCase(paquete.getMensaje())) {
-                                    controlador.procesarTiradaDado();
-                                } else if (paquete.getMensaje().startsWith("MOVER_FICHA:")) {
-                                    int idFicha = Integer.parseInt(paquete.getMensaje().split(":")[1]);
-                                    controlador.procesarAccionJugador(paquete.getIdEmisor(), idFicha);
-                                }
-                                break;
-                            case SYNC_ESTADO:
-                                controlador.notificarCambioEstado();
-                                break;
-                            case HEARTBEAT:
-                                break;
-                            case LOBBY_CONFIRM:
-                                System.out.println("Lobby confirmado: " + paquete.getMensaje());
-                                break;
+                        try {
+                            switch (paquete.getTipo()) {
+                                case ACCION:
+                                    if ("TIRAR_DADO".equalsIgnoreCase(paquete.getMensaje())) {
+                                        controlador.procesarTiradaDado();
+                                    } else if (paquete.getMensaje().startsWith("MOVER_FICHA:")) {
+                                        int idFicha = Integer.parseInt(paquete.getMensaje().split(":")[1]);
+                                        controlador.procesarAccionJugador(paquete.getIdEmisor(), idFicha);
+                                    }
+                                    break;
+
+                                case SYNC_ESTADO:
+                                    controlador.notificarCambioEstado();
+                                    break;
+
+                                case HEARTBEAT:
+                                    break;
+
+                                case LOBBY_CONFIRM:
+                                    System.out.println("Lobby confirmado: " + paquete.getMensaje());
+                                    break;
+                            }
+                        } catch (Exception ex) {
+                            System.err.println("Error procesando acción de juego: " + ex.getMessage());
                         }
                     }
                 }
             } catch (Exception e) {
-                System.err.println("Error procesando mensajes de red: " + e.getMessage());
+                System.err.println("Conexión perdida con socket: " + e.getMessage());
             } finally {
+                // Se ejecuta SOLO al perder el socket realmente
                 conexion.cerrarConexion();
+                removerConexion(conexion); // <--- Rompe el bucle infinito en la terminal
             }
         }).start();
     }

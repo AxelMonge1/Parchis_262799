@@ -24,18 +24,20 @@ public class GestorDesconexiones {
                 try {
                     Thread.sleep(timeoutMs);
                     long tiempoActual = System.currentTimeMillis();
+
                     List<ConexionTCP> conexionesActivas = new ArrayList<>(gestorRed.getConexiones());
 
                     for (ConexionTCP conexion : conexionesActivas) {
-                        if (tiempoActual - conexion.getUltimoHeartbeat() > timeoutMs) {
+                        // Verificar únicamente sockets que sigan marcados como activos
+                        if (conexion.isEstaActivo() && (tiempoActual - conexion.getUltimoHeartbeat() > timeoutMs)) {
                             System.out.println("Timeout detectado para jugador: " + conexion.getIdJugadorAsociado());
                             conexion.cerrarConexion();
+                            gestorRed.removerConexion(conexion); // Limpia la lista
                             manejarDesconexion(conexion.getIdJugadorAsociado());
                         }
                     }
 
                 } catch (InterruptedException e) {
-                    System.err.println("Error en el monitoreo de red: " + e.getMessage());
                     break;
                 }
             }
