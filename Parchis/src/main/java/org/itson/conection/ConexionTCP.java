@@ -6,6 +6,8 @@ import org.itson.conection.auxiliar.TipoPaquete;
 import java.io.*;
 import java.net.Socket;
 
+import static java.lang.System.out;
+
 public class ConexionTCP {
     private String ipRemota;
     private int puerto;
@@ -28,8 +30,13 @@ public class ConexionTCP {
     }
 
     public void enviarPaquete(PaqueteRed paquete) {
-        if (estaActivo && salida != null) {
-            salida.println(paquete.serializar());
+        if (estaActivo && out != null) {
+            // Imprime en consola local para depuración
+            out.println("Enviando paquete: " + paquete.serializar());
+
+            // Es indispensable usar println (para que readLine() lo detecte) y flush()
+            out.println(paquete.serializar());
+            out.flush();
         }
     }
 

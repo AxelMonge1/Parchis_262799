@@ -278,15 +278,31 @@ public class VistaJuego extends JFrame {
 
     public void prepararInterfazParaInicio(int miId, int turnoActual) {
         SwingUtilities.invokeLater(() -> {
+            // 1. FORZAR EL CAMBIO DE PANTALLA EN EL CardLayout
+            // Reemplaza PANTALLA_JUEGO con la constante/nombre que uses para la pantalla del tablero
+            mostrarPantalla(PANTALLA_JUEGO);
+
+            // 2. Actualizar estado del botón de lobby
             btnAccionLobby.setText("En Partida");
             btnAccionLobby.setEnabled(false);
 
-            mostrarTurnoActual(turnoActual);
-
+            // 3. Evaluar e informar el turno
             boolean esMiTurno = (miId == turnoActual);
             btnDado.setEnabled(esMiTurno);
 
+            // 4. Feedback visual explícito en un Label o en la consola de la UI
+            String mensajeEstado = esMiTurno
+                    ? "¡Es TU turno! Haz clic en Lanzar Dado."
+                    : "Turno del Jugador " + turnoActual + ". Esperando su jugada...";
+
+            mostrarMensaje(mensajeEstado); // O lblEstado.setText(mensajeEstado);
+
+            // 5. Dibujar tablero
             renderizarTablero();
+
+            // Forzar a Swing a repintar la ventana
+            revalidate();
+            repaint();
         });
     }
 
